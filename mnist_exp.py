@@ -335,7 +335,7 @@ def run_exp_3(sleep_iterations: int, acc_df: list):
         acc_df = log_accuracy(f'SRC-{sleep_iterations}', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks)
 
         # Generate masked input for the sleep phase
-        sleep_period = int(sleep_iterations + task_id * sleep_iterations/5)
+        sleep_period = int(sleep_iterations + task_id * sleep_iterations/3)
         sleep_input = create_masked_input(task_train_x, sleep_period, 10)
 
         # Calculate the alpha
