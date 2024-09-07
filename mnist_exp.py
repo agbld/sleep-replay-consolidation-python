@@ -6,9 +6,10 @@ import torch.optim as optim
 import numpy as np
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, TensorDataset
-import random
 from tqdm import tqdm
 import pandas as pd
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #%%
 # MNIST Dataset Loading
@@ -82,7 +83,7 @@ def train_network(model, train_x, train_y, opts):
     
     for epoch in range(num_epochs):
         for batch_idx, (data, target) in enumerate(loader):
-            data, target = data.to(torch.device("cpu")), target.to(torch.device("cpu"))
+            data, target = data.to(torch.device(device)), target.to(torch.device(device))
             optimizer.zero_grad()
             output = model(data)
             loss = criterion(output, target)
@@ -101,7 +102,7 @@ def evaluate_all(model, test_x, test_y):
     
     with torch.no_grad():  # Disable gradient calculations
         for data, target in loader:
-            data, target = data.to(torch.device("cpu")), target.to(torch.device("cpu"))
+            data, target = data.to(torch.device(device)), target.to(torch.device(device))
             output = model(data)
             _, predicted = torch.max(output.data, 1)  # Get the index of the max log-probability
             total += target.size(0)
@@ -130,7 +131,7 @@ def evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks=num_tasks):
             correct = 0
             total = 0
             for data, target in loader:
-                data, target = data.to(torch.device("cpu")), target.to(torch.device("cpu"))
+                data, target = data.to(torch.device(device)), target.to(torch.device(device))
                 output = model(data)
                 _, predicted = torch.max(output.data, 1)
                 total += target.size(0)
@@ -166,11 +167,13 @@ nn_size_template = [784, 1200, 1200, 10]
 # Exp 1: Sleep Replay Consolidation (SRC)
 
 def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, sleep_input: torch.Tensor):
+    sleep_input = sleep_input.to(device)
+
     nn_size = [nn.layers[0].in_features] + [layer.out_features for layer in nn.layers]
 
-    membrane_potentials = [torch.zeros(size) for size in nn_size]
-    spikes = [torch.zeros(size) for size in nn_size]
-    refrac_end = [torch.zeros(size) for size in nn_size]
+    membrane_potentials = [torch.zeros(size).to(device) for size in nn_size]
+    spikes = [torch.zeros(size).to(device) for size in nn_size]
+    refrac_end = [torch.zeros(size).to(device) for size in nn_size]
 
     with torch.no_grad():
         with tqdm(total=num_iterations) as pbar:
@@ -178,11 +181,11 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, sleep_input
                 # Create Poisson-distributed spikes from the input images
                 # The input is randomly spiked at each time step
                 rescale_factor = 1 / (sleep_opts['dt'] * sleep_opts['max_rate']) # Rescale factor based on maximum firing rate
-                spike_snapshots = torch.rand(nn_size[0]) * rescale_factor / 2 # Generate random spikes
+                spike_snapshots = torch.rand(nn_size[0]).to(device) * rescale_factor / 2 # Generate random spikes
                 input_spikes = (spike_snapshots <= sleep_input[t]).float() # Compare to sleep input to determine spikes
 
                 # Fisrt layer spikes are based on the input directly
-                spikes[0] = torch.Tensor(input_spikes)
+                spikes[0] = torch.Tensor(input_spikes).to(device)
 
                 # Update the membrane potentials and spikes for each layer (starting from second layer)
                 for l in range(1, len(nn_size)):
@@ -297,7 +300,7 @@ def create_masked_input(X, numexamples, mask_size):
 def run_exp_3(sleep_iterations: int, acc_df: list):
 
     # src_model = SimpleNN([784, 1200, 1200, 10])
-    src_model = SimpleNN(nn_size_template)
+    src_model = SimpleNN(nn_size_template).to(device)
 
     # Define the hyperparameters for the sleep phase
     alpha_scale = 55.882454
@@ -361,7 +364,7 @@ acc_df = run_exp_3(40, acc_df)
 
 #%%
 # Exp 2: Sequential Training
-control_model = SimpleNN(nn_size_template)
+control_model = SimpleNN(nn_size_template).to(device)
 
 acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_x, test_y, test_tasks)
 
@@ -382,7 +385,7 @@ print(evaluate_all(control_model, test_x, test_y))
 
 #%%
 # Exp 3: Parallel Training
-model = SimpleNN(nn_size_template)
+model = SimpleNN(nn_size_template).to(device)
 
 acc_df = log_accuracy('Parallel', 'Initial', acc_df, model, test_x, test_y, test_tasks)
 
