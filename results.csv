@@ -1,0 +1,22 @@
+Approach,Stage,Task 0,Task 1,Task 2,Task 3,Task 4,All
+SRC-40,Initial, 4.68, 0.34,26.25, 6.09,16.54,10.47
+SRC-40,Task 0 Before SRC,99.95, 0.00, 0.00, 0.00, 0.00,21.14
+SRC-40,Task 0 After SRC,99.91, 0.00, 0.00, 0.00, 0.00,21.13
+SRC-40,Task 1 Before SRC, 0.00,97.55, 0.00, 0.00, 0.00,19.92
+SRC-40,Task 1 After SRC, 0.99,97.85, 0.00, 0.00, 0.00,20.19
+SRC-40,Task 2 Before SRC, 0.00, 0.00,99.36, 0.00, 0.00,18.62
+SRC-40,Task 2 After SRC,16.26, 2.84,97.76, 0.00, 0.00,22.34
+SRC-40,Task 3 Before SRC, 0.00, 0.00, 0.00,99.50, 0.00,19.76
+SRC-40,Task 3 After SRC,19.53, 2.20,31.75,98.89, 0.00,30.17
+SRC-40,Task 4 Before SRC, 0.00, 0.00, 0.00, 0.00,97.73,19.38
+SRC-40,Task 4 After SRC, 0.76,12.49,11.53,14.95,96.42,26.96
+SRC-40,After Training, 0.76,12.49,11.53,14.95,96.42,26.96
+Sequential,Initial, 3.55, 0.00,31.11, 0.05, 7.21,8.02
+Sequential,Task 0,99.91, 0.00, 0.00, 0.00, 0.00,21.13
+Sequential,Task 1, 0.00,97.55, 0.00, 0.00, 0.00,19.92
+Sequential,Task 2, 0.00, 0.00,99.20, 0.00, 0.00,18.59
+Sequential,Task 3, 0.00, 0.00, 0.00,99.55, 0.00,19.77
+Sequential,Task 4, 0.00, 0.00, 0.00, 0.00,97.43,19.32
+Sequential,After Training, 0.00, 0.00, 0.00, 0.00,97.43,19.32
+Parallel,Initial,38.39,16.06, 0.16,11.58, 5.70,14.86
+Parallel,After Training,99.10,95.49,97.12,96.78,94.45,96.61
