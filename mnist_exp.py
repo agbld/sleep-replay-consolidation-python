@@ -161,7 +161,7 @@ opts = {
     'momentum': 0.5         # Momentum for SGD
 }
 
-nn_size_template = [784, 1200, 1200, 10]
+nn_size_template = [784, 4000, 4000, 10]
 
 #%%
 # Exp 1: Sleep Replay Consolidation (SRC)
@@ -357,10 +357,10 @@ def run_exp_3(sleep_iterations: int, acc_df: list):
 
     return acc_df
 
-# for sleep_iterations in [10, 20, 30, 40, 50]:
-#     acc_df = run_exp_3(sleep_iterations, acc_df)
+for sleep_iterations in [5, 20, 40, 60, 80, 100, 150, 200, 500, 1000]:
+    acc_df = run_exp_3(sleep_iterations, acc_df)
 
-acc_df = run_exp_3(40, acc_df)
+# acc_df = run_exp_3(40, acc_df)
 
 #%%
 # Exp 2: Sequential Training
