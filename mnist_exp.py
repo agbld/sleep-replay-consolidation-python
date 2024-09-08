@@ -158,7 +158,7 @@ acc_df = []
 opts = {
     'numepochs': 2,         # Number of epochs
     'batchsize': 100,       # Batch size for training
-    'learning_rate': 0.1,   # Learning rate for SGD
+    'learning_rate': 0.01,   # Learning rate for SGD
     'momentum': 0.5         # Momentum for SGD
 }
 
@@ -168,6 +168,8 @@ nn_size_template = [784, 4000, 4000, 10]
 # Exp 1: Sleep Replay Consolidation (SRC)
 
 def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, sleep_input: torch.Tensor):
+    nn.eval()  # Set the network to evaluation mode (disabling dropout)
+
     sleep_input = sleep_input.to(device)
 
     nn_size = [nn.layers[0].in_features] + [layer.out_features for layer in nn.layers]
@@ -363,13 +365,19 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
 
     return acc_df
 
-for iteration in range(10, 100, 10):
-    for factor in [1, 2, 4, 8, 16]:
-        acc_df = run_exp_3(acc_df, {
-            'iterations': iteration * factor, 
-            'inc': 0.032064 / factor,
-            'dec': 0.003344 / factor,
-            })
+# for iteration in range(10, 100, 10):
+#     for factor in [1, 2, 4, 8, 16]:
+#         acc_df = run_exp_3(acc_df, {
+#             'iterations': iteration * factor, 
+#             'inc': 0.032064 / factor,
+#             'dec': 0.003344 / factor,
+#             })
+
+acc_df = run_exp_3(acc_df, {
+    'iterations': 400, 
+    'inc': 0.004,
+    'dec': 0.0004,
+    })
 
 #%%
 # Exp 2: Sequential Training
