@@ -47,8 +47,10 @@ def create_class_task(x, y, task_size=2):
 
     return tasks, y
 
-num_tasks = 5
-task_size = (10 + num_tasks - 1) // num_tasks
+# num_tasks = 10
+# task_size = (10 + num_tasks - 1) // num_tasks
+task_size = 8
+num_tasks = (10 + task_size - 1) // task_size
 print(f'Number of Tasks: {num_tasks}')
 print(f'Task Size: {task_size}')
 tasks, train_y = create_class_task(train_x, train_y, task_size)
@@ -334,10 +336,21 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
         print(f'Task {task_id}')
 
         task_indices = np.where(tasks == task_id)[0]
-        task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
-        task_train_y = train_y[task_indices[:5000]]
         
-        src_model = train_network(src_model, task_train_x, task_train_y, opts)
+        if task_id == 0:
+            task_train_x = train_x[task_indices[:20000]]  # Use the first 20000 samples for pretrained task
+            task_train_y = train_y[task_indices[:20000]]
+            pretrain_opts = {
+                'numepochs': 2,         # Number of epochs
+                'batchsize': 100,       # Batch size for training
+                'learning_rate': 0.1,   # Learning rate for SGD
+                'momentum': 0.5         # Momentum for SGD
+            }
+            src_model = train_network(src_model, task_train_x, task_train_y, pretrain_opts)
+        else:
+            task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
+            task_train_y = train_y[task_indices[:5000]]
+            src_model = train_network(src_model, task_train_x, task_train_y, opts)
 
         print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks))
         
@@ -373,8 +386,9 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
 #             'dec': 0.003344 / factor,
 #             })
 
-for iteration in [200, 300, 400, 500, 600]:
+for iteration in [3000, 4000, 5000]: #[200, 300, 400, 500, 600]:
     acc_df = run_exp_3(acc_df, {
+
         'iterations': iteration, 
         'inc': 0.001,
         'dec': 0.0001,
@@ -388,10 +402,21 @@ acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_x, te
 
 for task_id in range(num_tasks):
     task_indices = np.where(tasks == task_id)[0]
-    task_train_x = train_x[task_indices[:5000]]  # Train on the first 5000 samples for each task
-    task_train_y = train_y[task_indices[:5000]]
     
-    control_model = train_network(control_model, task_train_x, task_train_y, opts)
+    if task_id == 0:
+        task_train_x = train_x[task_indices[:20000]]  # Train on the first 20000 samples for pretrained task
+        task_train_y = train_y[task_indices[:20000]]
+        pretrain_opts = {
+            'numepochs': 2,         # Number of epochs
+            'batchsize': 100,       # Batch size for training
+            'learning_rate': 0.1,   # Learning rate for SGD
+            'momentum': 0.5         # Momentum for SGD
+        }
+        control_model = train_network(control_model, task_train_x, task_train_y, opts)
+    else:
+        task_train_x = train_x[task_indices[:5000]]  # Train on the first 5000 samples for each task
+        task_train_y = train_y[task_indices[:5000]]
+        control_model = train_network(control_model, task_train_x, task_train_y, opts)
 
     print(evaluate_per_task(control_model, test_x, test_y, test_tasks))
 
