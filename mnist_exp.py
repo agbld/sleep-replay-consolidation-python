@@ -373,11 +373,12 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
 #             'dec': 0.003344 / factor,
 #             })
 
-acc_df = run_exp_3(acc_df, {
-    'iterations': 400, 
-    'inc': 0.004,
-    'dec': 0.0004,
-    })
+for iteration in [200, 300, 400, 500, 600]:
+    acc_df = run_exp_3(acc_df, {
+        'iterations': iteration, 
+        'inc': 0.001,
+        'dec': 0.0001,
+        })
 
 #%%
 # Exp 2: Sequential Training
