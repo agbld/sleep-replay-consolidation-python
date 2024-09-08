@@ -60,7 +60,7 @@ test_tasks, test_y = create_class_task(test_x, test_y, task_size)
 class SimpleNN(nn.Module):
     def __init__(self, layers):
         super(SimpleNN, self).__init__()
-        self.layers = nn.ModuleList([nn.Linear(layers[i], layers[i + 1]) for i in range(len(layers) - 1)])
+        self.layers = nn.ModuleList([nn.Linear(layers[i], layers[i + 1], bias=False) for i in range(len(layers) - 1)])
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(p=0.25)
 
@@ -192,6 +192,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, sleep_input
                 for l in range(1, len(nn_size)):
                     # Compute the input impulse based on spikes from the previous layer
                     impulse = nn.layers[l - 1](spikes[l - 1]) * sleep_opts['alpha'][l - 1]
+                    # impulse = nn.layers[l - 1].weight @ spikes[l - 1] * sleep_opts['alpha'][l - 1]
                     impulse = impulse - torch.mean(impulse) * sleep_opts['W_inh'] # Apply inhibition
 
                     # Update the membrane potential with decay and the input impulse
@@ -362,10 +363,13 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
 
     return acc_df
 
-for factor in [10]:
-    acc_df = run_exp_3(acc_df, {'iterations': 60 * factor, 
-                                'inc': 0.032064 / factor,
-                                'dec': 0.003344 / factor,})
+for iteration in range(10, 100, 10):
+    for factor in [1, 2, 4, 8, 16]:
+        acc_df = run_exp_3(acc_df, {
+            'iterations': iteration * factor, 
+            'inc': 0.032064 / factor,
+            'dec': 0.003344 / factor,
+            })
 
 #%%
 # Exp 2: Sequential Training
