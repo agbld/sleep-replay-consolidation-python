@@ -143,10 +143,11 @@ def evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks=num_tasks):
     
     return accuracies
 
-def log_accuracy(approach: str, stage: str, acc_df: list, model: SimpleNN, test_x, test_y, test_tasks):
+def log_accuracy(approach: str, stage: str, acc_df: list, model: SimpleNN, test_x, test_y, test_tasks, args: dict = {}):
     acc_dict = {}
     acc_dict['Approach'] = approach
     acc_dict['Stage'] = stage
+    acc_dict.update(args)
     acc_dict.update(evaluate_per_task(model, test_x, test_y, test_tasks))
     acc_dict['All'] = evaluate_all(model, test_x, test_y)
     acc_df.append(acc_dict)
@@ -258,7 +259,7 @@ def normalize_nn_data(nn: SimpleNN, x):
         
         # Forward propagate the input data
         nn.eval()  # Set the network to evaluation mode (disabling dropout)
-        activations = nn.forward(torch.Tensor(x))  # Forward propagate through the network
+        activations = nn.forward(torch.Tensor(x).to(device))  # Forward propagate through the network
         nn.train()  # Set back to training mode after forward pass
         
         previous_factor = 1.0
@@ -297,15 +298,17 @@ def create_masked_input(X, numexamples, mask_size):
     sleep_x = sleep_x.reshape(numexamples, 784)
     return sleep_x
 
-def run_exp_3(sleep_iterations: int, acc_df: list):
+def run_exp_3(acc_df: list, sleep_opts_update={}):
 
     # src_model = SimpleNN([784, 1200, 1200, 10])
     src_model = SimpleNN(nn_size_template).to(device)
 
     # Define the hyperparameters for the sleep phase
-    alpha_scale = 55.882454
     sleep_opts = {
+        'iterations': 1,
         'beta': [14.548273, 44.560317, 38.046326],
+        'alpha_scale': 55.882454,
+        'alpha': [14.983829, 253.17746, 7.7707720],
         'decay': 0.999,
         'W_inh': 0.0,
         'inc': 0.032064,
@@ -319,7 +322,10 @@ def run_exp_3(sleep_iterations: int, acc_df: list):
         'dt': 0.001,
     }
 
-    acc_df = log_accuracy(f'SRC-{sleep_iterations}', 'Initial', acc_df, src_model, test_x, test_y, test_tasks)
+    sleep_opts.update(sleep_opts_update)
+    print(sleep_opts)
+
+    acc_df = log_accuracy(f'SRC', 'Initial', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
     for task_id in range(num_tasks):
         print(f'Task {task_id}')
@@ -332,35 +338,34 @@ def run_exp_3(sleep_iterations: int, acc_df: list):
 
         print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks))
         
-        acc_df = log_accuracy(f'SRC-{sleep_iterations}', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks)
+        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
         # Generate masked input for the sleep phase
-        sleep_period = int(sleep_iterations + task_id * sleep_iterations/3)
+        sleep_period = int(sleep_opts['iterations'] + task_id * float(sleep_opts['iterations']) / 3)
         sleep_input = create_masked_input(task_train_x, sleep_period, 10)
 
         # Calculate the alpha
         # _, factor_log = normalize_nn_data(src_model, task_train_x)
-        # sleep_opts['alpha'] = [alpha * alpha_scale for alpha in factor_log]
+        # sleep_opts['alpha'] = [alpha * sleep_opts['alpha_scale'] for alpha in factor_log]
         # print('alpha: ', sleep_opts['alpha'])
-        sleep_opts['alpha'] = [14.983829, 253.17746, 7.7707720]
 
         # Run the sleep phase
         src_model = sleep_phase(src_model, sleep_period, sleep_opts, torch.tensor(sleep_input))
         
         print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks))
 
-        acc_df = log_accuracy(f'SRC-{sleep_iterations}', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks)
+        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
-    acc_df = log_accuracy(f'SRC-{sleep_iterations}', 'After Training', acc_df, src_model, test_x, test_y, test_tasks)
+    acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
     print(evaluate_all(src_model, test_x, test_y))
 
     return acc_df
 
-for sleep_iterations in [5, 20, 40, 60, 80, 100, 150, 200, 500, 1000]:
-    acc_df = run_exp_3(sleep_iterations, acc_df)
-
-# acc_df = run_exp_3(40, acc_df)
+for factor in [10]:
+    acc_df = run_exp_3(acc_df, {'iterations': 60 * factor, 
+                                'inc': 0.032064 / factor,
+                                'dec': 0.003344 / factor,})
 
 #%%
 # Exp 2: Sequential Training
