@@ -1,13 +1,15 @@
 #%%
 # Import necessary libraries
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import numpy as np
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import pandas as pd
+
+from utils.nn import SimpleNN
+from utils.nn import train_network, evaluate_all, evaluate_per_task, log_accuracy
+from utils.task import create_class_task
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -32,126 +34,15 @@ test_y = test_dataset.targets.numpy()
 #%%
 # Task Generation
 
-def create_class_task(x, y, task_size=2):
-    """Splits the dataset into tasks by grouping certain classes."""
-    tasks = np.zeros_like(y)
-    unique_classes = np.unique(y)
-    task_id = 0
-
-    # Assign each pair of classes to a task
-    for i in range(0, len(unique_classes), task_size):
-        class_group = unique_classes[i:i+task_size]
-        indices = np.isin(y, class_group)
-        tasks[indices] = task_id
-        task_id += 1
-
-    return tasks, y
-
 num_tasks = 5
 task_size = (10 + num_tasks - 1) // num_tasks
 print(f'Number of Tasks: {num_tasks}')
 print(f'Task Size: {task_size}')
-tasks, train_y = create_class_task(train_x, train_y, task_size)
-test_tasks, test_y = create_class_task(test_x, test_y, task_size)
+train_tasks = create_class_task(train_y, task_size)
+test_tasks = create_class_task(test_y, task_size)
 
 #%%
-# Simple Neural Network
-
-class SimpleNN(nn.Module):
-    def __init__(self, layers):
-        super(SimpleNN, self).__init__()
-        self.layers = nn.ModuleList([nn.Linear(layers[i], layers[i + 1], bias=False) for i in range(len(layers) - 1)])
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(p=0.25)
-
-    def forward(self, x):
-        for layer in self.layers[:-1]:
-            x = self.relu(layer(x))
-            x = self.dropout(x)
-        x = self.layers[-1](x)
-        return x
-
-def train_network(model, train_x, train_y, opts):
-    model.train()
-    optimizer = optim.SGD(model.parameters(), lr=opts['learning_rate'], momentum=opts['momentum'])
-    criterion = nn.CrossEntropyLoss()
-    num_epochs = opts['numepochs']
-    batch_size = opts['batchsize']
-    
-    dataset = TensorDataset(torch.tensor(train_x), torch.tensor(train_y, dtype=torch.long))
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    
-    for epoch in range(num_epochs):
-        for batch_idx, (data, target) in enumerate(loader):
-            data, target = data.to(torch.device(device)), target.to(torch.device(device))
-            optimizer.zero_grad()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-
-    return model
-
-def evaluate_all(model, test_x, test_y):
-    model.eval()  # Set the model to evaluation mode
-    correct = 0
-    total = 0
-    
-    dataset = TensorDataset(torch.tensor(test_x), torch.tensor(test_y, dtype=torch.long))
-    loader = DataLoader(dataset, batch_size=100, shuffle=False)
-    
-    with torch.no_grad():  # Disable gradient calculations
-        for data, target in loader:
-            data, target = data.to(torch.device(device)), target.to(torch.device(device))
-            output = model(data)
-            _, predicted = torch.max(output.data, 1)  # Get the index of the max log-probability
-            total += target.size(0)
-            correct += (predicted == target).sum().item()
-    
-    accuracy = 100 * correct / total
-    # print(f'Accuracy All: {accuracy:.2f}%')
-    return accuracy
-
-def evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks=num_tasks):
-    model.eval()  # Set the model to evaluation mode
-    accuracies = {}
-    
-    # Evaluate accuracy for each task
-    with torch.no_grad():
-        for task_id in range(num_tasks):
-            # Get the indices of the examples for the current task
-            task_indices = np.where(test_tasks == task_id)[0]
-            task_test_x = test_x[task_indices]
-            task_test_y = test_y[task_indices]
-            
-            # Create a DataLoader for this task's data
-            dataset = TensorDataset(torch.tensor(task_test_x), torch.tensor(task_test_y, dtype=torch.long))
-            loader = DataLoader(dataset, batch_size=100, shuffle=False)
-            
-            correct = 0
-            total = 0
-            for data, target in loader:
-                data, target = data.to(torch.device(device)), target.to(torch.device(device))
-                output = model(data)
-                _, predicted = torch.max(output.data, 1)
-                total += target.size(0)
-                correct += (predicted == target).sum().item()
-            
-            accuracy = 100 * correct / total if total > 0 else 0
-            accuracies[f'Task {task_id}'] = f'{accuracy:5.2f}'
-            # print(f'Accuracy for Task {task_id}: {accuracy:.2f}%')
-    
-    return accuracies
-
-def log_accuracy(approach: str, stage: str, acc_df: list, model: SimpleNN, test_x, test_y, test_tasks, args: dict = {}):
-    acc_dict = {}
-    acc_dict['Approach'] = approach
-    acc_dict['Stage'] = stage
-    acc_dict.update(args)
-    acc_dict.update(evaluate_per_task(model, test_x, test_y, test_tasks))
-    acc_dict['All'] = evaluate_all(model, test_x, test_y)
-    acc_df.append(acc_dict)
-    return acc_df
+# Configuration
 
 acc_df = []
 
@@ -301,7 +192,7 @@ def create_masked_input(X, numexamples, mask_size):
     sleep_x = sleep_x.reshape(numexamples, 784)
     return sleep_x
 
-def run_exp_3(acc_df: list, sleep_opts_update={}):
+def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     # src_model = SimpleNN([784, 1200, 1200, 10])
     src_model = SimpleNN(nn_size_template).to(device)
@@ -333,13 +224,13 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
     for task_id in range(num_tasks):
         print(f'Task {task_id}')
 
-        task_indices = np.where(tasks == task_id)[0]
+        task_indices = np.where(train_tasks == task_id)[0]
         task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
         task_train_y = train_y[task_indices[:5000]]
         
         src_model = train_network(src_model, task_train_x, task_train_y, opts)
 
-        print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks))
+        print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
         
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
@@ -355,7 +246,7 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
         # Run the sleep phase
         src_model = sleep_phase(src_model, sleep_period, sleep_opts, torch.tensor(sleep_input))
         
-        print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks))
+        print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
 
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
@@ -365,20 +256,14 @@ def run_exp_3(acc_df: list, sleep_opts_update={}):
 
     return acc_df
 
-# for iteration in range(10, 100, 10):
-#     for factor in [1, 2, 4, 8, 16]:
-#         acc_df = run_exp_3(acc_df, {
-#             'iterations': iteration * factor, 
-#             'inc': 0.032064 / factor,
-#             'dec': 0.003344 / factor,
-#             })
-
-for iteration in [200, 300, 400, 500, 600]:
-    acc_df = run_exp_3(acc_df, {
-        'iterations': iteration, 
-        'inc': 0.001,
-        'dec': 0.0001,
-        })
+for iteration in [400]:
+    acc_df = run_sleep_exp(
+        acc_df, 
+        {
+            'iterations': iteration, 
+            'inc': 0.001,
+            'dec': 0.0001,
+        },)
 
 #%%
 # Exp 2: Sequential Training
@@ -387,13 +272,13 @@ control_model = SimpleNN(nn_size_template).to(device)
 acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_x, test_y, test_tasks)
 
 for task_id in range(num_tasks):
-    task_indices = np.where(tasks == task_id)[0]
+    task_indices = np.where(train_tasks == task_id)[0]
     task_train_x = train_x[task_indices[:5000]]  # Train on the first 5000 samples for each task
     task_train_y = train_y[task_indices[:5000]]
     
     control_model = train_network(control_model, task_train_x, task_train_y, opts)
 
-    print(evaluate_per_task(control_model, test_x, test_y, test_tasks))
+    print(evaluate_per_task(control_model, test_x, test_y, test_tasks, num_tasks))
 
     acc_df = log_accuracy('Sequential', 'Task ' + str(task_id), acc_df, control_model, test_x, test_y, test_tasks)
 
@@ -411,7 +296,7 @@ train_network(model, train_x, train_y, opts)
 
 acc_df = log_accuracy('Parallel', 'After Training', acc_df, model, test_x, test_y, test_tasks)
 
-print(evaluate_per_task(model, test_x, test_y, test_tasks))
+print(evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks))
 print(evaluate_all(model, test_x, test_y))
 
 #%%
