@@ -221,35 +221,11 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         
         src_model = train_network(src_model, task_train_x, task_train_y, opts)
 
-
-        # ----- Visualize the layer activations -----
+        # [Visual] Record activations before SRC for layer visualization
         with torch.no_grad():
             src_model.eval()
-
-            activations = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
-
-            layer_activations = [act.cpu() for act in activations.values()]
-            reduced_activations = []
-
-            for i in range(len(layer_activations)):
-                if i == len(layer_activations) - 1:
-                    reduced_data = layer_activations[i].detach().numpy()
-                else:
-                    pca = PCA(n_components=10)
-                    reduced_data = pca.fit_transform(layer_activations[i])
-                reduced_activations.append(reduced_data)
-
-            # plot the reduced activations as images for each layer
-            fig, axs = plt.subplots(1, len(reduced_activations), figsize=(len(reduced_activations) * 6, 5))
-            fig.suptitle(f'Layer Activations for Task {task_id} Before SRC')
-
-            for i, reduced_data in enumerate(reduced_activations):
-                axs[i].imshow(reduced_data, aspect='auto')
-                axs[i].set_title(f'Layer {i}')
-            
-            fig.savefig(f'./png/layer_activations_task_{task_id}_before_src.png')
-        # -------------------------------------------
-
+            activations_before = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
+            layer_activations_before = [act.cpu() for act in activations_before.values()]
 
         print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
         
@@ -271,34 +247,46 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
-        
-        # ----- Visualize the layer activations -----
+        # [Visual] Record activations after SRC for layer visualization
         with torch.no_grad():
             src_model.eval()
 
-            activations = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
+            activations_after = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
+            layer_activations_after = [act.cpu() for act in activations_after.values()]
 
-            layer_activations = [act.cpu() for act in activations.values()]
-            reduced_activations = []
+        # [Visual] Fit PCA to the activations and reduce the dimensionality
+        reduced_activations_before = []
+        reduced_activations_after = []
+        reduced_activations_diff = []
+        for i in range(len(src_model.layers)):
+            if i == len(src_model.layers) - 1:
+                reduced_activations_before.append(layer_activations_before[i])
+                reduced_activations_after.append(layer_activations_after[i])
 
-            for i in range(len(layer_activations)):
-                if i == len(layer_activations) - 1:
-                    reduced_data = layer_activations[i].detach().numpy()
-                else:
-                    pca = PCA(n_components=10)
-                    reduced_data = pca.fit_transform(layer_activations[i])
-                reduced_activations.append(reduced_data)
+            pca = PCA(n_components=10)
+            layer_activations = np.concatenate((layer_activations_before[i], layer_activations_after[i]))
+            reduced_activations = pca.fit_transform(layer_activations)
 
-            # plot the reduced activations as images for each layer
-            fig, axs = plt.subplots(1, len(reduced_activations), figsize=(len(reduced_activations) * 6, 5))
-            fig.suptitle(f'Layer Activations for Task {task_id} After SRC')
+            reduced_activations_before.append(reduced_activations[:len(layer_activations_before[i])])
+            reduced_activations_after.append(reduced_activations[len(layer_activations_before[i]):])
+            reduced_activations_diff.append(reduced_activations_after[i] - reduced_activations_before[i])
 
-            for i, reduced_data in enumerate(reduced_activations):
-                axs[i].imshow(reduced_data, aspect='auto')
-                axs[i].set_title(f'Layer {i}')
+        # [Visual] Plot the reduced activations as images for each layer before and after SRC
+        fig, axs = plt.subplots(3, len(src_model.layers), figsize=(len(src_model.layers) * 6, 12))
+        fig.suptitle(f'Layer Activations for Task {task_id}: Before, After SRC, and Difference', fontsize=18)
+        cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
 
-            fig.savefig(f'./png/layer_activations_task_{task_id}_after_src.png')
-        # -------------------------------------------
+        for i in range(len(src_model.layers)):
+            im1 = axs[0, i].imshow(reduced_activations_before[i], aspect='auto')
+            axs[0, i].set_title(f'Layer {i} - Before SRC', fontsize=12)
+            im2 = axs[1, i].imshow(reduced_activations_after[i], aspect='auto')
+            axs[1, i].set_title(f'Layer {i} - After SRC', fontsize=12)
+            im3 = axs[2, i].imshow(reduced_activations_diff[i], aspect='auto')
+            axs[2, i].set_title(f'Layer {i} - Diff.', fontsize=12)
+
+        fig.colorbar(im3, cax=cbar_ax)
+
+        fig.savefig(f'./png/layer_activations_task_{task_id}_before_after_src.png')
 
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
