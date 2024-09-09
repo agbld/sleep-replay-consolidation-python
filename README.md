@@ -5,6 +5,20 @@ GitHub Repo: https://github.com/agbld/sleep-replay-consolidation-python
 This is a replicate of the original implementation of the Sleep Replay Consolidation (SRC) algorithm in Python. The original implementation [tmtadros/SleepReplayConsolidation](https://github.com/tmtadros/SleepReplayConsolidation.git) was in MATLAB and was used in the following paper:
 * Tadros, T., Krishnan, G. P., Ramyaa, R., & Bazhenov, M. (2022a). *Sleep-like unsupervised replay reduces catastrophic forgetting in artificial neural networks*. Nature Communications, 13(1). https://doi.org/10.1038/s41467-022-34938-7
 
+## TODO
+
+- [ ] Figure out the formula of `alpha` and `beta` in the SRC algorithm. 
+  - [ ] See *Sleep Replay Consolidation (SRC) algorithm* part under *Methods* section in the paper. 
+  - [ ] Also see [*Fast-classifying, high-accuracy spiking deep networks through weight and threshold balancing*](https://ieeexplore.ieee.org/document/7280696) (IJCNN 2015) for the exact scaling algorithm.
+- [ ] Implement model merging and compare it with SRC.
+- [ ] Extract the PCA component importance and use it to calculate the model capacity "usage" of each task. Observe how SRC reallocates model capacity during incremental learning.
+- [ ] Solve the bias problem.
+  - [ ] Figure out the current bias scaling algorithm.
+  - [ ] If it indeed only do the scaling and won't modify during sleep phase, then the following problem might occur.
+    * In a NN, there are two types of major parameters: weights and biases. Each of them play crucial roles while learning. Optimizer used in the training phase will try its best to adjust both weights and biases to fit on current task.
+    * According to observation, so far, SRC do the "recall" or "memories recovery" things by **selectively adjusting the weights**. SRC seek to find a best compromised weights across all tasks. However, the **bias distribution may shift across tasks** as well.
+    * If the target tasks are somehow **"bias-sensitive"**, then the SRC might **suffer from the "outdated" bias**, resulting in the catastrophic forgetting again.
+
 ## Experiments
 
 ### MNIST
