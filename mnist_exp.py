@@ -46,8 +46,8 @@ test_tasks = create_class_task(test_y, task_size)
 
 sequential_train_x = []
 
-for task_id in range(num_tasks):
-    task_indices = np.where(train_tasks == task_id)[0]
+for i in range(10):
+    task_indices = np.where(train_y == i)[0]
     task_train_x = train_x[task_indices[:1000]]  # Use the first 5000 samples for each task
     sequential_train_x.append(task_train_x)
 
