@@ -340,6 +340,33 @@ acc_df = log_accuracy('Parallel', 'After Training', acc_df, model, test_x, test_
 print(evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks))
 print(evaluate_all(model, test_x, test_y))
 
+# [Visual] Record activations layer visualization
+with torch.no_grad():
+    control_model.eval()
+
+    activations = get_activations(model.to(device), torch.Tensor(sequential_train_x).to(device))
+    layer_activations = [act.cpu() for act in activations.values()]
+
+# [Visual] Fit PCA to the activations and reduce the dimensionality
+reduced_activations = []
+for i in range(len(model.layers)):
+    if i == len(model.layers) - 1:
+        reduced_activations.append(layer_activations[i])
+
+    pca = PCA(n_components=10)
+    reduced_activations.append(pca.fit_transform(layer_activations[i]))
+
+# [Visual] Plot the reduced activations as images for each layer before and after SRC
+fig, axs = plt.subplots(1, len(model.layers), figsize=(len(model.layers) * 6, 5))
+fig.suptitle(f'Layer Activations for Task {task_id}: Before, After SRC, and Difference', fontsize=18)
+
+for i in range(len(model.layers)):
+    im2 = axs[i].imshow(reduced_activations[i], aspect='auto')
+    axs[i].set_title(f'Layer {i} - After SRC', fontsize=12)
+    fig.colorbar(im2, ax=axs[i])
+
+fig.savefig(f'./png/layer_activations_parallel.png')
+
 #%%
 acc_df = pd.DataFrame(acc_df)
 
