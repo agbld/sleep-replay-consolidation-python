@@ -1,9 +1,9 @@
 # Sleep Replay Consolidation (SRC) - Python
 
+GitHub Repo: https://github.com/agbld/sleep-replay-consolidation-python
+
 This is a replicate of the original implementation of the Sleep Replay Consolidation (SRC) algorithm in Python. The original implementation [tmtadros/SleepReplayConsolidation](https://github.com/tmtadros/SleepReplayConsolidation.git) was in MATLAB and was used in the following paper:
 * Tadros, T., Krishnan, G. P., Ramyaa, R., & Bazhenov, M. (2022a). *Sleep-like unsupervised replay reduces catastrophic forgetting in artificial neural networks*. Nature Communications, 13(1). https://doi.org/10.1038/s41467-022-34938-7
-
-[TOC]
 
 ## Experiments
 
@@ -21,7 +21,7 @@ The following visualizations show the activations for each model across differen
 
 Each row of subplots contains three subplots, each representing a layer, with Layer 0 on the left through Layer 2 (the output layer) on the right.
 
-In each subplot, the **x-axis** represents different ten **"neuron clusters"**. PCA is applied to reduce the dimensionality of each layer's activations from 4000 to 10. The **PCA projection matrices** are **aligned under the same layer in the same task**, but **differ across tasks** due to the nature of PCA. Note that the **last layer (Layer 2)** shows raw activation values **without PCA**, as it already consists of 10 dimensions. The **y-axis** represents the **input indices**, ordered from top to bottom as Task 0, Task 1, ... Task 4. Each task contains 1000 samples.
+In each subplot, the **x-axis** represents different ten **"neuron clusters"**. PCA is applied to reduce the dimensionality of each layer's activations from 4000 to 10. The **PCA projection matrices** are **aligned under the same layer in the same task**, but **differ across tasks** due to the nature of PCA. Note that the **last layer (Layer 2)** shows raw activation values **without PCA**, as it already consists of 10 dimensions. The **y-axis** represents the **input indices**, which are ordered by class index from top to bottom as class 0, class 1, ..., class 9. Each class contains 1000 samples.
 
 ##### SRC - Before, After, and Difference
 
@@ -42,3 +42,9 @@ In each subplot, the **x-axis** represents different ten **"neuron clusters"**. 
 ##### Parallel Learning (Upper Bound)
 
 ![](./png/layer_activations_parallel.png)
+
+<!-- ### Ideas
+* Instead of using a **fixed amount** for increasing or decreasing, a slight **"step-back"** to the previous model state (before SRC) might be better. (?)
+    * According to the dynamics of visualized activations, the SRC algorithm **does not** seem to actually "recover" lost memories. 
+    * Instead, it **selectively "cancels" the model's ability** on the current task and makes the model **"less focused" on the current task**. 
+    * SRC causes the model to be **less confident** in everything, especially newly learned tasks. -->
