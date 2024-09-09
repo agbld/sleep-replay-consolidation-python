@@ -6,10 +6,13 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import pandas as pd
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
 
 from utils.nn import SimpleNN
 from utils.nn import train_network, evaluate_all, evaluate_per_task, log_accuracy
 from utils.task import create_class_task
+from utils.sleep import create_masked_input, get_activations, get_spikes
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -40,6 +43,15 @@ print(f'Number of Tasks: {num_tasks}')
 print(f'Task Size: {task_size}')
 train_tasks = create_class_task(train_y, task_size)
 test_tasks = create_class_task(test_y, task_size)
+
+sequential_train_x = []
+
+for task_id in range(num_tasks):
+    task_indices = np.where(train_tasks == task_id)[0]
+    task_train_x = train_x[task_indices[:1000]]  # Use the first 5000 samples for each task
+    sequential_train_x.append(task_train_x)
+
+sequential_train_x = np.concatenate(sequential_train_x)
 
 #%%
 # Configuration
@@ -171,19 +183,6 @@ def normalize_nn_data(nn: SimpleNN, x):
 
     return nn, factor_log
 
-def create_masked_input(X, numexamples, mask_size):
-    sleep_input = np.mean(X, axis=0)
-    sleep_input = sleep_input.reshape(28, 28)
-    sleep_x = np.zeros((numexamples, 28, 28))
-
-    for i in range(numexamples):
-        x_pos = np.random.randint(0, 28 - mask_size)
-        y_pos = np.random.randint(0, 28 - mask_size)
-        sleep_x[i, x_pos:x_pos + mask_size, y_pos:y_pos + mask_size] = sleep_input[x_pos:x_pos + mask_size, y_pos:y_pos + mask_size]
-
-    sleep_x = sleep_x.reshape(numexamples, 784)
-    return sleep_x
-
 def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     # src_model = SimpleNN([784, 1200, 1200, 10])
@@ -222,6 +221,36 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         
         src_model = train_network(src_model, task_train_x, task_train_y, opts)
 
+
+        # ----- Visualize the layer activations -----
+        with torch.no_grad():
+            src_model.eval()
+
+            activations = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
+
+            layer_activations = [act.cpu() for act in activations.values()]
+            reduced_activations = []
+
+            for i in range(len(layer_activations)):
+                if i == len(layer_activations) - 1:
+                    reduced_data = layer_activations[i].detach().numpy()
+                else:
+                    pca = PCA(n_components=10)
+                    reduced_data = pca.fit_transform(layer_activations[i])
+                reduced_activations.append(reduced_data)
+
+            # plot the reduced activations as images for each layer
+            fig, axs = plt.subplots(1, len(reduced_activations), figsize=(len(reduced_activations) * 6, 5))
+            fig.suptitle(f'Layer Activations for Task {task_id} Before SRC')
+
+            for i, reduced_data in enumerate(reduced_activations):
+                axs[i].imshow(reduced_data, aspect='auto')
+                axs[i].set_title(f'Layer {i}')
+            
+            fig.savefig(f'./png/layer_activations_task_{task_id}_before_src.png')
+        # -------------------------------------------
+
+
         print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
         
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
@@ -241,6 +270,35 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
 
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
+
+        
+        # ----- Visualize the layer activations -----
+        with torch.no_grad():
+            src_model.eval()
+
+            activations = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
+
+            layer_activations = [act.cpu() for act in activations.values()]
+            reduced_activations = []
+
+            for i in range(len(layer_activations)):
+                if i == len(layer_activations) - 1:
+                    reduced_data = layer_activations[i].detach().numpy()
+                else:
+                    pca = PCA(n_components=10)
+                    reduced_data = pca.fit_transform(layer_activations[i])
+                reduced_activations.append(reduced_data)
+
+            # plot the reduced activations as images for each layer
+            fig, axs = plt.subplots(1, len(reduced_activations), figsize=(len(reduced_activations) * 6, 5))
+            fig.suptitle(f'Layer Activations for Task {task_id} After SRC')
+
+            for i, reduced_data in enumerate(reduced_activations):
+                axs[i].imshow(reduced_data, aspect='auto')
+                axs[i].set_title(f'Layer {i}')
+
+            fig.savefig(f'./png/layer_activations_task_{task_id}_after_src.png')
+        # -------------------------------------------
 
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
