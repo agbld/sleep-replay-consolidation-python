@@ -255,6 +255,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
             layer_activations_after = [act.cpu() for act in activations_after.values()]
 
         # [Visual] Fit PCA to the activations and reduce the dimensionality
+        reduced_activations = []
         reduced_activations_before = []
         reduced_activations_after = []
         reduced_activations_diff = []
@@ -265,26 +266,28 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
             pca = PCA(n_components=10)
             layer_activations = np.concatenate((layer_activations_before[i], layer_activations_after[i]))
-            reduced_activations = pca.fit_transform(layer_activations)
+            reduced_activations.append(pca.fit_transform(layer_activations))
 
-            reduced_activations_before.append(reduced_activations[:len(layer_activations_before[i])])
-            reduced_activations_after.append(reduced_activations[len(layer_activations_before[i]):])
+            reduced_activations_before.append(reduced_activations[i][:len(layer_activations_before[i])])
+            reduced_activations_after.append(reduced_activations[i][len(layer_activations_before[i]):])
             reduced_activations_diff.append(reduced_activations_after[i] - reduced_activations_before[i])
 
         # [Visual] Plot the reduced activations as images for each layer before and after SRC
         fig, axs = plt.subplots(3, len(src_model.layers), figsize=(len(src_model.layers) * 6, 12))
         fig.suptitle(f'Layer Activations for Task {task_id}: Before, After SRC, and Difference', fontsize=18)
-        cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
 
         for i in range(len(src_model.layers)):
             im1 = axs[0, i].imshow(reduced_activations_before[i], aspect='auto')
             axs[0, i].set_title(f'Layer {i} - Before SRC', fontsize=12)
-            im2 = axs[1, i].imshow(reduced_activations_after[i], aspect='auto')
-            axs[1, i].set_title(f'Layer {i} - After SRC', fontsize=12)
-            im3 = axs[2, i].imshow(reduced_activations_diff[i], aspect='auto')
-            axs[2, i].set_title(f'Layer {i} - Diff.', fontsize=12)
+            fig.colorbar(im1, ax=axs[0, i])
 
-        fig.colorbar(im3, cax=cbar_ax)
+            im2 = axs[1, i].imshow(reduced_activations_after[i], aspect='auto') #, vmin=before_after_min, vmax=before_after_max)
+            axs[1, i].set_title(f'Layer {i} - After SRC', fontsize=12)
+            fig.colorbar(im2, ax=axs[1, i])
+
+            im3 = axs[2, i].imshow(reduced_activations_diff[i], aspect='auto') #, vmin=-20, vmax=5)
+            axs[2, i].set_title(f'Layer {i} - Diff.', fontsize=12)
+            fig.colorbar(im3, ax=axs[2, i])
 
         fig.savefig(f'./png/layer_activations_task_{task_id}_before_after_src.png')
 
