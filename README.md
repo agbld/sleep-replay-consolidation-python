@@ -31,6 +31,14 @@ In each subplot, the **x-axis** represents different ten **"neuron clusters"**. 
 ![](./png/layer_activations_task_3_before_after_src.png)
 ![](./png/layer_activations_task_4_before_after_src.png)
 
+##### Sequential Learning (Lower Bound)
+
+![](./png/layer_activations_task_0_sequential.png)
+![](./png/layer_activations_task_1_sequential.png)
+![](./png/layer_activations_task_2_sequential.png)
+![](./png/layer_activations_task_3_sequential.png)
+![](./png/layer_activations_task_4_sequential.png)
+
 ##### Parallel Learning (Upper Bound)
 
 ![](./png/layer_activations_parallel.png)
