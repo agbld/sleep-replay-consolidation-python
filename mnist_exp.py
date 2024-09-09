@@ -289,8 +289,8 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
             axs[2, i].set_title(f'Layer {i} - Diff.', fontsize=12)
             fig.colorbar(im3, ax=axs[2, i])
 
-        fig.savefig(f'./png/layer_activations_task_{task_id}_before_after_src.png')
-
+        fig.savefig(f'./png/layer_activations_task_{task_id}_before_after_src.png', bbox_inches='tight', facecolor='w')
+                    
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
     print(evaluate_all(src_model, test_x, test_y))
@@ -365,7 +365,7 @@ for i in range(len(model.layers)):
     axs[i].set_title(f'Layer {i} - After SRC', fontsize=12)
     fig.colorbar(im2, ax=axs[i])
 
-fig.savefig(f'./png/layer_activations_parallel.png')
+fig.savefig(f'./png/layer_activations_parallel.png', bbox_inches='tight', facecolor='w')
 
 #%%
 acc_df = pd.DataFrame(acc_df)
