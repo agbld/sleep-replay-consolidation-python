@@ -83,49 +83,41 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, sleep_input
 
                 # Update the membrane potentials and spikes for each layer (starting from second layer)
                 for l in range(1, len(nn_size)):
-                    # Compute the input impulse based on spikes from the previous layer
-                    impulse = nn.layers[l - 1](spikes[l - 1]) * sleep_opts['alpha'][l - 1]
-                    # impulse = nn.layers[l - 1].weight @ spikes[l - 1] * sleep_opts['alpha'][l - 1]
-                    impulse = impulse - torch.mean(impulse) * sleep_opts['W_inh'] # Apply inhibition
 
-                    # Update the membrane potential with decay and the input impulse
+                    # Compute the input impulse based on spikes from the previous layer, update membrane potentials
+                    impulse = nn.layers[l - 1](spikes[l - 1]) * sleep_opts['alpha'][l - 1]
+                    impulse = impulse - torch.mean(impulse) * sleep_opts['W_inh'] # Apply inhibition
                     membrane_potentials[l] = membrane_potentials[l] * sleep_opts['decay'] + impulse
 
                     # Add a direct current (DC) component for layer 4, if needed
-                    # if l == len(nn_size) - 1:
-                    #     membrane_potentials[l] += sleep_opts['DC']
+                    if l == len(nn_size) - 1:
+                        membrane_potentials[l] += sleep_opts['DC']
                     
-                    # Check for spiking based on membrane potential exceeding threshold
-                    spikes[l] = torch.Tensor((membrane_potentials[l] >= sleep_opts['threshold'] * sleep_opts['beta'][l - 1]).float())
-
-
+                    # Update spiking state based on membrane potential and threshold
+                    threshold = sleep_opts['threshold'] * sleep_opts['beta'][l - 1]
+                    spikes[l] = torch.Tensor((membrane_potentials[l] >= threshold).float())
 
                     # Spike-Timing Dependent Plasticity (STDP) to adjust weights
+                    def stdp(weight, pre, post):
+                        # Compute the weight delta using broadcasting
+                        sigmoid_weights = torch.sigmoid(weight)
+
+                        # Compute the weight delta using broadcasting
+                        weight_inc = sleep_opts['inc'] * (post == 1) * (pre == 1) * sigmoid_weights
+                        weight_dec = sleep_opts['dec'] * (post == 1) * (pre == 0) * sigmoid_weights
+
+                        # Combine increments and decrements
+                        return weight_inc - weight_dec
 
                     # Get pre-synaptic spikes and post-synaptic spikes
-                    pre = spikes[l - 1]  # (num_pre_neurons,)
-                    post = spikes[l]  # (num_post_neurons,)
-
-                    # Reshape pre and post for broadcasting
-                    pre_broadcast = pre.unsqueeze(0)  # (1, num_pre_neurons)
-                    post_broadcast = post.unsqueeze(1)  # (num_post_neurons, 1)
-
-                    # Compute the weight delta using broadcasting
-                    sigmoid_weights = torch.sigmoid(nn.layers[l - 1].weight)
-
-                    # Apply increment where post is 1 and pre is 1
-                    weight_inc = sleep_opts['inc'] * (post_broadcast == 1) * (pre_broadcast == 1) * sigmoid_weights
-
-                    # Apply decrement where post is 1 and pre is 0
-                    weight_dec = sleep_opts['dec'] * (post_broadcast == 1) * (pre_broadcast == 0) * sigmoid_weights
-
-                    # Combine increments and decrements
-                    weight_delta = weight_inc - weight_dec
+                    pre = spikes[l - 1].unsqueeze(0)  # (num_pre_neurons,) -> (1, num_pre_neurons)
+                    post = spikes[l].unsqueeze(1)  # (num_post_neurons,) -> (num_post_neurons, 1)
+                    
+                    # Compute the weight delta
+                    weight_delta = stdp(nn.layers[l - 1].weight, pre, post)
 
                     # Update weights
                     nn.layers[l - 1].weight += weight_delta
-
-
 
                     # Reset the membrane potential of spiking neurons
                     membrane_potentials[l][spikes[l] == 1] = 0
