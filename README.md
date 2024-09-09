@@ -2,8 +2,11 @@
 
 GitHub Repo: https://github.com/agbld/sleep-replay-consolidation-python
 
-This is a replicate of the original implementation of the Sleep Replay Consolidation (SRC) algorithm in Python. The original implementation [tmtadros/SleepReplayConsolidation](https://github.com/tmtadros/SleepReplayConsolidation.git) was in MATLAB and was used in the following paper:
-* Tadros, T., Krishnan, G. P., Ramyaa, R., & Bazhenov, M. (2022a). *Sleep-like unsupervised replay reduces catastrophic forgetting in artificial neural networks*. Nature Communications, 13(1). https://doi.org/10.1038/s41467-022-34938-7
+This is a Python replica of the original implementation of the Sleep Replay Consolidation (SRC) algorithm, as proposed in [*Sleep-like unsupervised replay reduces catastrophic forgetting in artificial neural networks*](https://doi.org/10.1038/s41467-022-34938-7) (Nature Communications) by Tadros et al., 2022.
+
+The SRC algorithm is designed to mitigate catastrophic forgetting in artificial neural networks by consolidating knowledge across tasks during sleep phases.
+
+The original implementation, [tmtadros/SleepReplayConsolidation](https://github.com/tmtadros/SleepReplayConsolidation.git), was written in MATLAB.
 
 ## TODO
 
@@ -19,7 +22,25 @@ This is a replicate of the original implementation of the Sleep Replay Consolida
     * According to observation, so far, SRC do the "recall" or "memories recovery" things by **selectively adjusting the weights**. SRC seek to find a best compromised weights across all tasks. However, the **bias distribution may shift across tasks** as well.
     * If the target tasks are somehow **"bias-sensitive"**, then the SRC might **suffer from the "outdated" bias**, resulting in the catastrophic forgetting again.
 
+
+
+- [ ] Figure out the formula for `alpha` and `beta` in the SRC algorithm.
+  - [ ] See the *Sleep Replay Consolidation (SRC) algorithm* section under the *Methods* section in the paper.
+  - [ ] Also see [*Fast-classifying, high-accuracy spiking deep networks through weight and threshold balancing*](https://ieeexplore.ieee.org/document/7280696) (IJCNN 2015) for the exact scaling algorithm.
+- [ ] Implement *model merging* approach and compare it with SRC.
+- [ ] Extract the PCA component importance and use it to calculate the model capacity "usage" of each task. Observe how SRC reallocates model capacity during incremental learning.
+- [ ] Solve the bias problem.
+  - [ ] Currently, the bias is **disabled** in both the official and this Python implementation. However, the paper mentions that the bias is **scaled** during the sleep phase, which means the algorithm should be able to handle the bias as well.
+  - [ ] Figure out the current bias scaling algorithm.
+  - [ ] If it indeed only does the scaling and won't modify biases during the sleep phase, then the following problems might occur:
+    * In a neural network (NN), there are two major types of parameters: weights and biases. Each of them plays a crucial role while learning. The optimizer used in the training phase will try its best to adjust both weights and biases to fit the current task.
+    * According to observations, so far, SRC does the "recall" or "memory recovery" by **selectively adjusting the weights**. SRC seeks to find the best compromised weights across all tasks. However, the **bias distribution may shift across tasks** as well.
+    * If the target tasks are somehow **"bias-sensitive"**, then SRC might **suffer from the "outdated" bias**, resulting in catastrophic forgetting again.
+
+
 ## Experiments
+
+Following are the experiments conducted solely on this Python implementation.
 
 ### MNIST
 
