@@ -237,18 +237,71 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     return acc_df
 
-for iteration in [300]:
+for iteration in [400]:
     acc_df = run_sleep_exp(
         acc_df, 
         {
             'iterations': iteration, 
-            'bonus_iterations': int(iteration / 2),
+            'bonus_iterations': int(iteration / 3),
             'inc': 0.001,
             'dec': 0.0001,
         },)
 
 #%%
-# Exp 2: Sequential Training
+# Exp 2: Model Merging
+
+task_models = []
+
+# [Visual] Initialize the NeuronDeveloper for layer visualization
+neuron_developer = NeuronDeveloper(title=f'Layer Activations: Merging',
+                                    output_path=f'./png/layer_activations_merging.png')
+
+for task_id in range(num_tasks):
+
+    task_model = SimpleNN(nn_size_template).to(device)
+    task_indices = np.where(train_tasks == task_id)[0]
+    task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
+    task_train_y = train_y[task_indices[:5000]]
+    acc_df = log_accuracy('Merging', 'Task ' + str(task_id) + ' Initial', acc_df, task_model, test_x, test_y, test_tasks)
+    task_model = train_network(task_model, task_train_x, task_train_y, opts)
+    print(evaluate_per_task(task_model, test_x, test_y, test_tasks, num_tasks))
+    acc_df = log_accuracy('Merging', 'Task ' + str(task_id), acc_df, task_model, test_x, test_y, test_tasks)
+
+    # [Visual] Record activations layer visualization
+    neuron_developer.record(task_model, sequential_train_x, 'Task ' + str(task_id) + ' Model')
+
+    task_models.append(task_model)
+
+merged_model = SimpleNN(nn_size_template).to(device)
+for layer in merged_model.layers:
+    if hasattr(layer, 'weight'):
+        torch.nn.init.constant_(layer.weight, 0)
+    if hasattr(layer, 'bias') and layer.bias is not None:
+        torch.nn.init.constant_(layer.bias, 0)
+
+for task_model in task_models:
+    for i, layer in enumerate(task_model.layers):
+        with torch.no_grad():
+            merged_model.layers[i].weight += layer.weight / num_tasks
+            if layer.bias is not None:
+                merged_model.layers[i].bias += layer.bias / num_tasks
+
+acc_df = log_accuracy('Merging', 'Merged', acc_df, merged_model, test_x, test_y, test_tasks)
+print(evaluate_per_task(merged_model, test_x, test_y, test_tasks, num_tasks))
+print(evaluate_all(merged_model, test_x, test_y))
+
+# [Visual] Record activations layer visualization
+neuron_developer.record(merged_model, sequential_train_x, 'Merged')
+
+# [Visual] Reduce the dimensionality of the activations using PCA
+neuron_developer.reduce(pca_components=10)
+
+# [Visual] Show and save the plot
+neuron_developer.show(mean_pooling)
+neuron_developer.save()
+
+#%%
+# Exp 3: Sequential Training
 control_model = SimpleNN(nn_size_template).to(device)
 
 acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_x, test_y, test_tasks)
@@ -284,7 +337,7 @@ acc_df = log_accuracy('Sequential', 'After Training', acc_df, control_model, tes
 print(evaluate_all(control_model, test_x, test_y))
 
 #%%
-# Exp 3: Parallel Training
+# Exp 4: Parallel Training
 parallel_model = SimpleNN(nn_size_template).to(device)
 
 # [Visual] Initialize the NeuronDeveloper for layer visualization
