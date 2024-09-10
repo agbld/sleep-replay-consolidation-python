@@ -13,7 +13,7 @@ The original implementation, [tmtadros/SleepReplayConsolidation](https://github.
 - [ ] Figure out the formula for `alpha` and `beta` in the SRC algorithm.
   - [ ] See the *Sleep Replay Consolidation (SRC) algorithm* section under the *Methods* section in the paper.
   - [ ] Also see [*Fast-classifying, high-accuracy spiking deep networks through weight and threshold balancing*](https://ieeexplore.ieee.org/document/7280696) (IJCNN 2015) for the exact scaling algorithm.
-- [ ] Implement *model merging* approach and compare it with SRC.
+- [x] Implement *model merging* approach and compare it with SRC.
 - [ ] Extract the PCA component importance and use it to calculate the model capacity "usage" of each task. Observe how SRC reallocates model capacity during incremental learning.
 - [ ] Solve the bias problem.
   - [ ] Currently, the bias is **disabled** in both the official and this Python implementation. However, the paper mentions that the bias is **scaled** during the sleep phase, which means the algorithm should be able to handle the bias as well.
