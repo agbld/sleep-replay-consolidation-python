@@ -33,7 +33,7 @@ The `mnist_exp.py` script try to replicate the original experiment ([see here!](
 
 #### Accuracy
 
-![image](https://hackmd.io/_uploads/rk4RN-hh0.png)
+![image](./results.jpg)
 
 #### Neuron Activity Visualization
 
@@ -50,6 +50,10 @@ In each subplot, the **x-axis** represents different ten **"neuron clusters"**. 
 ![](./png/layer_activations_task_2_before_after_src.png)
 ![](./png/layer_activations_task_3_before_after_src.png)
 ![](./png/layer_activations_task_4_before_after_src.png)
+
+##### Model Merging (Average)
+
+![](./png/layer_activations_merging.png)
 
 ##### Sequential Learning (Lower Bound)
 
