@@ -9,10 +9,10 @@ import pandas as pd
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
-from utils.nn import SimpleNN
-from utils.nn import train_network, evaluate_all, evaluate_per_task, log_accuracy
+from utils.nn import SimpleNN, NeuronDeveloper
+from utils.nn import train_network, evaluate_all, evaluate_per_task, log_accuracy, get_activations
 from utils.task import create_class_task
-from utils.sleep import create_masked_input, get_activations, get_spikes
+from utils.sleep import create_masked_input
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -66,6 +66,8 @@ opts = {
 }
 
 nn_size_template = [784, 4000, 4000, 10]
+
+mean_pooling = True
 
 #%%
 # Exp 1: Sleep Replay Consolidation (SRC)
@@ -150,39 +152,6 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, sleep_input
                 
     return nn
 
-def normalize_nn_data(nn: SimpleNN, x):
-
-    with torch.no_grad():
-        factor_log = []
-        
-        # Forward propagate the input data
-        nn.eval()  # Set the network to evaluation mode (disabling dropout)
-        activations = nn.forward(torch.Tensor(x).to(device))  # Forward propagate through the network
-        nn.train()  # Set back to training mode after forward pass
-        
-        previous_factor = 1.0
-        
-        # Iterate over each layer (assuming nn.W is a list of weight matrices and activations)
-        for l in range(len(nn.layers)):
-            # Get the maximum weight and maximum activation
-            weight_max = np.max(np.maximum(0, nn.layers[l].weight.data.cpu().numpy()))
-            activation_max = np.max(np.maximum(0, activations[l+1].cpu().numpy()))  # activations[l+1] is the next layer's activation
-            
-            # Calculate the scaling factor
-            scale_factor = max(weight_max, activation_max)
-            applied_inv_factor = scale_factor / previous_factor
-            
-            # Rescale the weights
-            nn.layers[l].weight.data /= applied_inv_factor
-            
-            # Store the factor log
-            factor_log.append(1.0 / applied_inv_factor)
-            
-            # Update previous factor for the next layer
-            previous_factor = applied_inv_factor
-
-    return nn, factor_log
-
 def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     # src_model = SimpleNN([784, 1200, 1200, 10])
@@ -191,6 +160,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     # Define the hyperparameters for the sleep phase
     sleep_opts = {
         'iterations': 1,
+        'bonus_iterations': 0,
         'beta': [14.548273, 44.560317, 38.046326],
         'alpha_scale': 55.882454,
         'alpha': [14.983829, 253.17746, 7.7707720],
@@ -215,6 +185,10 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     for task_id in range(num_tasks):
         print(f'Task {task_id}')
 
+        # [Visual] Initialize the NeuronDeveloper for layer visualization
+        neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Before, After SRC, and Difference',
+                                           output_path=f'./png/layer_activations_task_{task_id}_before_after_src.png')
+
         task_indices = np.where(train_tasks == task_id)[0]
         task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
         task_train_y = train_y[task_indices[:5000]]
@@ -222,17 +196,16 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         src_model = train_network(src_model, task_train_x, task_train_y, opts)
 
         # [Visual] Record activations before SRC for layer visualization
-        with torch.no_grad():
-            src_model.eval()
-            activations_before = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
-            layer_activations_before = [act.cpu() for act in activations_before.values()]
+        neuron_developer.record(src_model, 
+                                sequential_train_x, 
+                                'Before SRC')
 
         print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
         
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
         # Generate masked input for the sleep phase
-        sleep_period = int(sleep_opts['iterations'] + task_id * float(sleep_opts['iterations']) / 3)
+        sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
         sleep_input = create_masked_input(task_train_x, sleep_period, 10)
 
         # Calculate the alpha
@@ -247,61 +220,29 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
-        # [Visual] Record activations after SRC for layer visualization
-        with torch.no_grad():
-            src_model.eval()
+        # [Visual] Record activations after SRC and calculate the difference
+        neuron_developer.record(src_model, sequential_train_x, 'After SRC')
+        neuron_developer.record_diff('After SRC', 'Before SRC', 'Difference')
 
-            activations_after = get_activations(src_model.to(device), torch.Tensor(sequential_train_x).to(device))
-            layer_activations_after = [act.cpu() for act in activations_after.values()]
+        # [Visual] Reduce the dimensionality of the activations using PCA
+        neuron_developer.reduce(pca_components=10)
 
-        # [Visual] Fit PCA to the activations and reduce the dimensionality
-        reduced_activations = []
-        reduced_activations_before = []
-        reduced_activations_after = []
-        reduced_activations_diff = []
-        for i in range(len(src_model.layers)):
-            if i == len(src_model.layers) - 1:
-                reduced_activations_before.append(layer_activations_before[i])
-                reduced_activations_after.append(layer_activations_after[i])
+        # [Visual] Show and save the plot
+        neuron_developer.show(mean_pooling)
+        neuron_developer.save()
 
-            pca = PCA(n_components=10)
-            layer_activations = np.concatenate((layer_activations_before[i], layer_activations_after[i]))
-            reduced_activations.append(pca.fit_transform(layer_activations))
-
-            reduced_activations_before.append(reduced_activations[i][:len(layer_activations_before[i])])
-            reduced_activations_after.append(reduced_activations[i][len(layer_activations_before[i]):])
-            reduced_activations_diff.append(reduced_activations_after[i] - reduced_activations_before[i])
-
-        # [Visual] Plot the reduced activations as images for each layer before and after SRC
-        fig, axs = plt.subplots(3, len(src_model.layers), figsize=(len(src_model.layers) * 6, 12))
-        fig.suptitle(f'Layer Activations for Task {task_id}: Before, After SRC, and Difference', fontsize=18)
-
-        for i in range(len(src_model.layers)):
-            im1 = axs[0, i].imshow(reduced_activations_before[i], aspect='auto')
-            axs[0, i].set_title(f'Layer {i} - Before SRC', fontsize=12)
-            fig.colorbar(im1, ax=axs[0, i])
-
-            im2 = axs[1, i].imshow(reduced_activations_after[i], aspect='auto') #, vmin=before_after_min, vmax=before_after_max)
-            axs[1, i].set_title(f'Layer {i} - After SRC', fontsize=12)
-            fig.colorbar(im2, ax=axs[1, i])
-
-            im3 = axs[2, i].imshow(reduced_activations_diff[i], aspect='auto') #, vmin=-20, vmax=5)
-            axs[2, i].set_title(f'Layer {i} - Diff.', fontsize=12)
-            fig.colorbar(im3, ax=axs[2, i])
-
-        fig.savefig(f'./png/layer_activations_task_{task_id}_before_after_src.png', bbox_inches='tight', facecolor='w')
-                    
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
     print(evaluate_all(src_model, test_x, test_y))
 
     return acc_df
 
-for iteration in [400]:
+for iteration in [300]:
     acc_df = run_sleep_exp(
         acc_df, 
         {
             'iterations': iteration, 
+            'bonus_iterations': int(iteration / 2),
             'inc': 0.001,
             'dec': 0.0001,
         },)
@@ -313,6 +254,11 @@ control_model = SimpleNN(nn_size_template).to(device)
 acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_x, test_y, test_tasks)
 
 for task_id in range(num_tasks):
+
+    # [Visual] Initialize the NeuronDeveloper for layer visualization
+    neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Sequential',
+                                       output_path=f'./png/layer_activations_task_{task_id}_sequential.png')
+    
     task_indices = np.where(train_tasks == task_id)[0]
     task_train_x = train_x[task_indices[:5000]]  # Train on the first 5000 samples for each task
     task_train_y = train_y[task_indices[:5000]]
@@ -324,31 +270,14 @@ for task_id in range(num_tasks):
     acc_df = log_accuracy('Sequential', 'Task ' + str(task_id), acc_df, control_model, test_x, test_y, test_tasks)
 
     # [Visual] Record activations layer visualization
-    with torch.no_grad():
-        control_model.eval()
+    neuron_developer.record(control_model, sequential_train_x, 'Sequential')
 
-        activations = get_activations(control_model.to(device), torch.Tensor(sequential_train_x).to(device))
-        layer_activations = [act.cpu() for act in activations.values()]
+    # [Visual] Reduce the dimensionality of the activations using PCA
+    neuron_developer.reduce(pca_components=10)
 
-    # [Visual] Fit PCA to the activations and reduce the dimensionality
-    reduced_activations = []
-    for i in range(len(control_model.layers)):
-        if i == len(control_model.layers) - 1:
-            reduced_activations.append(layer_activations[i])
-
-        pca = PCA(n_components=10)
-        reduced_activations.append(pca.fit_transform(layer_activations[i]))
-
-    # [Visual] Plot the reduced activations as images for each layer before and after SRC
-    fig, axs = plt.subplots(1, len(control_model.layers), figsize=(len(control_model.layers) * 6, 5))
-    fig.suptitle(f'Layer Activations for Task {task_id}: Sequential', fontsize=18)
-
-    for i in range(len(control_model.layers)):
-        im2 = axs[i].imshow(reduced_activations[i], aspect='auto')
-        axs[i].set_title(f'Layer {i}', fontsize=12)
-        fig.colorbar(im2, ax=axs[i])
-
-    fig.savefig(f'./png/layer_activations_task_{task_id}_sequential.png', bbox_inches='tight', facecolor='w')
+    # [Visual] Show and save the plot
+    neuron_developer.show(mean_pooling)
+    neuron_developer.save()
 
 acc_df = log_accuracy('Sequential', 'After Training', acc_df, control_model, test_x, test_y, test_tasks)
 
@@ -356,43 +285,30 @@ print(evaluate_all(control_model, test_x, test_y))
 
 #%%
 # Exp 3: Parallel Training
-model = SimpleNN(nn_size_template).to(device)
+parallel_model = SimpleNN(nn_size_template).to(device)
 
-acc_df = log_accuracy('Parallel', 'Initial', acc_df, model, test_x, test_y, test_tasks)
+# [Visual] Initialize the NeuronDeveloper for layer visualization
+neuron_developer = NeuronDeveloper(title=f'Layer Activations: Parallel',
+                                   output_path=f'./png/layer_activations_parallel.png')
 
-train_network(model, train_x, train_y, opts)
+acc_df = log_accuracy('Parallel', 'Initial', acc_df, parallel_model, test_x, test_y, test_tasks)
 
-acc_df = log_accuracy('Parallel', 'After Training', acc_df, model, test_x, test_y, test_tasks)
+train_network(parallel_model, train_x, train_y, opts)
 
-print(evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks))
-print(evaluate_all(model, test_x, test_y))
+acc_df = log_accuracy('Parallel', 'After Training', acc_df, parallel_model, test_x, test_y, test_tasks)
+
+print(evaluate_per_task(parallel_model, test_x, test_y, test_tasks, num_tasks))
+print(evaluate_all(parallel_model, test_x, test_y))
 
 # [Visual] Record activations layer visualization
-with torch.no_grad():
-    model.eval()
+neuron_developer.record(parallel_model, sequential_train_x, 'Parallel')
 
-    activations = get_activations(model.to(device), torch.Tensor(sequential_train_x).to(device))
-    layer_activations = [act.cpu() for act in activations.values()]
+# [Visual] Reduce the dimensionality of the activations using PCA
+neuron_developer.reduce(pca_components=10)
 
-# [Visual] Fit PCA to the activations and reduce the dimensionality
-reduced_activations = []
-for i in range(len(model.layers)):
-    if i == len(model.layers) - 1:
-        reduced_activations.append(layer_activations[i])
-
-    pca = PCA(n_components=10)
-    reduced_activations.append(pca.fit_transform(layer_activations[i]))
-
-# [Visual] Plot the reduced activations as images for each layer before and after SRC
-fig, axs = plt.subplots(1, len(model.layers), figsize=(len(model.layers) * 6, 5))
-fig.suptitle(f'Layer Activations: Parallel', fontsize=18)
-
-for i in range(len(model.layers)):
-    im2 = axs[i].imshow(reduced_activations[i], aspect='auto')
-    axs[i].set_title(f'Layer {i}', fontsize=12)
-    fig.colorbar(im2, ax=axs[i])
-
-fig.savefig(f'./png/layer_activations_parallel.png', bbox_inches='tight', facecolor='w')
+# [Visual] Show and save the plot
+neuron_developer.show(mean_pooling)
+neuron_developer.save()
 
 #%%
 acc_df = pd.DataFrame(acc_df)
