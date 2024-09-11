@@ -23,6 +23,34 @@ The original implementation, [tmtadros/SleepReplayConsolidation](https://github.
     * According to observations, so far, SRC does the "recall" or "memory recovery" by **selectively adjusting the weights**. SRC seeks to find the best compromised weights across all tasks. However, the **bias distribution may shift across tasks** as well.
     * If the target tasks are somehow **"bias-sensitive"**, then SRC might **suffer from the "outdated" bias**, resulting in catastrophic forgetting again.
 
+## SRC Algorithm
+
+### Update Rules
+
+#### Input Layer:
+- **Layer 0 (Input)**: The processed input vector $h_0$ is directly assigned and contains only 0s and 1s, representing spikes or no spikes:
+
+  $$h_0 = \text{processed input vector} \in \{0, 1\}^n$$
+
+#### Activation Function:
+- For each subsequent layer $\ell > 0$, the activation vector $h_{\ell}$ is computed using a **Heaviside step function** with threshold $\beta_{\ell-1}$:
+
+  $$h_{\ell} = \Theta\left(\alpha_{\ell-1} \cdot W_{\ell} \times h_{\ell-1} - \beta_{\ell-1}\right)$$
+  
+  where:
+  - $W_{\ell}$: Weight matrix at layer $\ell$,
+  - $\alpha_{\ell-1}$: Scaling factor,
+  - $h_{\ell-1}$: Activation from previous layer.
+
+#### Weight Update Rule:
+- The weights are updated iteratively using both increment and decrement factors:
+
+  $$W_{\ell}^{t+1} = W_{\ell}^{t} + \text{inc} \cdot h_{\ell} \times h_{\ell-1}^{\top} - \text{dec} \cdot h_{\ell} \times \left(1 - h_{\ell-1}^{\top}\right)$$
+  
+  where:
+  - $\text{inc}$: Increment factor,
+  - $\text{dec}$: Decrement factor.
+
 ## Experiments
 
 Following are the experiments conducted solely on this Python implementation.
