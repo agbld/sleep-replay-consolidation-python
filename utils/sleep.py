@@ -1,8 +1,10 @@
 from utils.nn import SimpleNN
 import torch
 import numpy as np
+import warnings
 
 def create_masked_input(X, numexamples, mask_size):
+    warnings.warn("create_masked_input is deprecated and will be removed in a future version.", DeprecationWarning)
     sleep_input = np.mean(X, axis=0)
     sleep_input = sleep_input.reshape(28, 28)
     sleep_x = np.zeros((numexamples, 28, 28))

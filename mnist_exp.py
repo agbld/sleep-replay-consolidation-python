@@ -72,10 +72,20 @@ mean_pooling = True
 #%%
 # Exp 1: Sleep Replay Consolidation (SRC)
 
-def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, sleep_input: torch.Tensor):
+def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Tensor):
     nn.eval()  # Set the network to evaluation mode (disabling dropout)
 
-    sleep_input = sleep_input.to(device)
+    # [Differences from the original] 
+    # 1. Using a slightly different method for mask creation.
+    # 2. Using the mean of sampled X for each iteration instead of the entire X.
+    # Generate sleep input based on the mean of the input samples and a random mask.
+    sleep_input = np.zeros((num_iterations, X.shape[1]))
+    for i in range(num_iterations):
+        mask = np.random.choice([0, 1], size=X.shape[1], p=[1 - sleep_opts['mask_fraction'], sleep_opts['mask_fraction']])
+        sampled_X_for_iter = X[np.random.choice(X.shape[0], sleep_opts['samples_per_iter'])]
+        mean_sample = np.mean(sampled_X_for_iter, axis=0)
+        sleep_input[i] = mean_sample * mask
+    sleep_input = torch.Tensor(sleep_input).to(device)
 
     nn_size = [nn.layers[0].in_features] + [layer.out_features for layer in nn.layers]
 
@@ -160,7 +170,6 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     # Define the hyperparameters for the sleep phase
     sleep_opts = {
         'iterations': 1,
-        'bonus_iterations': 0,
         'beta': [14.548273, 44.560317, 38.046326],
         'alpha_scale': 55.882454,
         'alpha': [14.983829, 253.17746, 7.7707720],
@@ -175,6 +184,11 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         'gamma': 1.0,
         't_ref': 0,
         'dt': 0.001,
+
+        # --- Additional params from original SRC ---
+        'bonus_iterations': 0,
+        'mask_fraction': 0.25,
+        'samples_per_iter': 10,
     }
 
     sleep_opts.update(sleep_opts_update)
@@ -204,17 +218,14 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
-        # Generate masked input for the sleep phase
-        sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
-        sleep_input = create_masked_input(task_train_x, sleep_period, 10)
-
         # Calculate the alpha
         # _, factor_log = normalize_nn_data(src_model, task_train_x)
         # sleep_opts['alpha'] = [alpha * sleep_opts['alpha_scale'] for alpha in factor_log]
         # print('alpha: ', sleep_opts['alpha'])
 
-        # Run the sleep phase
-        src_model = sleep_phase(src_model, sleep_period, sleep_opts, torch.tensor(sleep_input))
+        # Run the sleep phase (with gradual increase in the number of iterations)
+        sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
+        src_model = sleep_phase(src_model, sleep_period, sleep_opts, task_train_x)
         
         print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
 
@@ -238,14 +249,19 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     return acc_df
 
 for iteration in [400]:
-    acc_df = run_sleep_exp(
-        acc_df, 
-        {
-            'iterations': iteration, 
-            'bonus_iterations': int(iteration / 3),
-            'inc': 0.001,
-            'dec': 0.0001,
-        },)
+    for mask_fraction in [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
+        acc_df = run_sleep_exp(
+            acc_df, 
+            {
+                'iterations': iteration, 
+                'inc': 0.001,
+                'dec': 0.0001,
+
+                # --- Additional params from original SRC ---
+                'bonus_iterations': int(iteration / 3),
+                'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
+                'samples_per_iter': 10, # original: (entire X from current task)
+            },)
 
 #%%
 # Exp 2: Model Merging
