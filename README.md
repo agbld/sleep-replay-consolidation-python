@@ -49,12 +49,14 @@ The following equations try to describe the SRC algorithm in a more detailed man
 
 #### Weight Update Rule:
 - The weight delta $\Delta W_{\ell}$ is computed using both increment and decrement factors:
+
   $$\Delta W_{\ell} = \left( \text{inc} \cdot h_{\ell} \times h_{\ell-1}^{\top} \right) \odot W_{\ell}^{t} - \left( \text{dec} \cdot h_{\ell} \times \left(1 - h_{\ell-1}^{\top}\right) \right) \odot W_{\ell}^{t}$$
   
   where:
   - $\text{inc}$: Increment factor,
   - $\text{dec}$: Decrement factor.
 - The weights are then updated iteratively as follows:
+
   $$W_{\ell}^{t+1} = W_{\ell}^{t} + \Delta W_{\ell}$$
 
 ## Experiments
