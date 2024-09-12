@@ -33,31 +33,32 @@ The following equations try to describe the SRC algorithm in a more detailed man
 ### Update Rules
 
 #### Input Layer:
-- **Layer 0 (Input)**: The processed input vector $h_0$ is directly assigned and contains only 0s and 1s, representing spikes or no spikes:
+The processed input vector $h_0$ is directly assigned and contains only 0s and 1s, representing spikes or no spikes:
 
-  $$h_0 = \text{processed input vector} \in \{0, 1\}^n$$
+$$h_0 = \text{processed input vector} \in \{0, 1\}^n$$
 
 #### Activation Function:
-- For each subsequent layer $\ell > 0$, the activation vector $h_{\ell}$ is computed using a **Heaviside step function** with threshold $\beta_{\ell-1}$:
+For each subsequent layer $\ell > 0$, the activation vector $h_{\ell}$ is computed using a **Heaviside step function** with threshold $\beta_{\ell-1}$:
 
-  $$h_{\ell} = \Theta\left(\alpha_{\ell-1} \cdot W_{\ell} \times h_{\ell-1} - \beta_{\ell-1}\right)$$
+$$h_{\ell} = \Theta\left(\alpha_{\ell-1} \cdot W_{\ell} \times h_{\ell-1} - \beta_{\ell-1}\right)$$
   
-  where:
-  - $W_{\ell}$: Weight matrix at layer $\ell$,
-  - $\alpha_{\ell-1}$: Scaling factor,
-  - $h_{\ell-1}$: Activation from previous layer.
+where:
+- $W_{\ell}$: Weight matrix at layer $\ell$,
+- $\alpha_{\ell-1}$: Scaling factor,
+- $h_{\ell-1}$: Activation from previous layer.
 
 #### Weight Update Rule:
-- The weight delta $\Delta W_{\ell}$ is computed using both increment and decrement factors:
+The weight delta $\Delta W_{\ell}$ is computed using both increment and decrement factors:
 
-  $$\Delta W_{\ell} = \left( \text{inc} \cdot h_{\ell} \times h_{\ell-1}^{\top} \right) \odot W_{\ell}^{t} - \left( \text{dec} \cdot h_{\ell} \times \left(1 - h_{\ell-1}^{\top}\right) \right) \odot W_{\ell}^{t}$$
+$$\Delta W_{\ell} = \left( \text{inc} \cdot h_{\ell} \times h_{\ell-1}^{\top} \right) \odot W_{\ell}^{t} - \left( \text{dec} \cdot h_{\ell} \times \left(1 - h_{\ell-1}^{\top}\right) \right) \odot W_{\ell}^{t}$$
   
-  where:
-  - $\text{inc}$: Increment factor,
-  - $\text{dec}$: Decrement factor.
-- The weights are then updated iteratively as follows:
+where:
+- $\text{inc}$: Increment factor,
+- $\text{dec}$: Decrement factor.
 
-  $$W_{\ell}^{t+1} = W_{\ell}^{t} + \Delta W_{\ell}$$
+The weights are then updated iteratively as follows:
+
+$$W_{\ell}^{t+1} = W_{\ell}^{t} + \Delta W_{\ell}$$
 
 ## Experiments
 
