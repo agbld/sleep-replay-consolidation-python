@@ -249,7 +249,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     return acc_df
 
 for iteration in [400]:
-    for mask_fraction in [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]:
+    for mask_fraction in [0.25]:
         acc_df = run_sleep_exp(
             acc_df, 
             {
