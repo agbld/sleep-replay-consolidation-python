@@ -92,11 +92,11 @@ Each group of subplots shows the transitions of activations for each task. Here 
    3. Apply the SRC algorithm to the model and get the new weight, denoted as $W_{\text{SRC}}$.
    4. Calculate the difference between $W_{\text{after}}$ and $W_{\text{SRC}}$, denoted as $\Delta W_{\text{SRC}}$.
 
-    $$\Delta W_{\text{SRC}} = W_{\text{SRC}} - W_{\text{after}}$$
+      $$\Delta W_{\text{SRC}} = W_{\text{SRC}} - W_{\text{after}}$$
 
    5. Finally, the weight of the synthetic model is calculated as follows:
 
-    $$W_{\text{synthetic}} = W_{\text{before}} + \Delta W_{\text{SRC}}$$
+      $$W_{\text{synthetic}} = W_{\text{before}} + \Delta W_{\text{SRC}}$$
 
     In our understanding, the $\Delta W_{\text{SRC}}$ should be a "compressed" version of the modification of task training. Although it doesn't seem that simple?
     We then use the $W_{\text{synthetic}}$ initialized the synthetic model.
