@@ -8,6 +8,7 @@ from tqdm import tqdm
 import pandas as pd
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+import copy
 
 from utils.nn import SimpleNN, NeuronDeveloper
 from utils.nn import train_network, evaluate_all, evaluate_per_task, log_accuracy, get_activations
@@ -207,6 +208,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
         task_train_y = train_y[task_indices[:5000]]
         
+        model_before_training = copy.deepcopy(src_model)
         src_model = train_network(src_model, task_train_x, task_train_y, opts)
 
         # [Visual] Record activations before SRC for layer visualization
@@ -225,6 +227,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         # Run the sleep phase (with gradual increase in the number of iterations)
         sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
+        model_before_src = copy.deepcopy(src_model)
         src_model = sleep_phase(src_model, sleep_period, sleep_opts, task_train_x)
         
         print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
@@ -233,6 +236,22 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         # [Visual] Record activations after SRC and calculate the difference
         neuron_developer.record(src_model, sequential_train_x, 'After SRC')
+
+        # Create a synthetic model by using the model_before_training + (src_model - model_before_src)
+        model_synthetic = SimpleNN(nn_size_template).to(device)
+        with torch.no_grad():
+            for i, layer in enumerate(model_synthetic.layers):
+                with torch.no_grad():
+                    layer.weight = torch.nn.Parameter(model_before_training.layers[i].weight + (src_model.layers[i].weight - model_before_src.layers[i].weight))
+
+        print('Synthetic SRC: ', evaluate_per_task(model_synthetic, test_x, test_y, test_tasks, num_tasks))
+
+        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Synthetic SRC', acc_df, model_synthetic, test_x, test_y, test_tasks, sleep_opts)
+
+        # [Visual] Record activations for the synthetic model
+        neuron_developer.record(model_synthetic, sequential_train_x, 'Synthetic SRC')
+
+        # [Visual] Record the difference between the activations before and after SRC
         neuron_developer.record_diff('After SRC', 'Before SRC', 'Difference')
 
         # [Visual] Reduce the dimensionality of the activations using PCA

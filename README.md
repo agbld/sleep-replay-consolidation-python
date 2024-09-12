@@ -28,7 +28,7 @@ The original implementation, [tmtadros/SleepReplayConsolidation](https://github.
 
 ## SRC Algorithm
 
-The following equations try to describe the SRC algorithm in a more detailed manner. All of the equations are based on my understanding of the original paper and the MATLAB implementation. Please note that these equations are **NOT official** and might not be 100% accurate.
+The following equations try to describe the SRC algorithm in a more detailed manner. All of the following equations are based on the original paper and the MATLAB implementation. Please note that these equations are **NOT official** and might not be 100% accurate.
 
 ### Update Rules
 
@@ -80,6 +80,26 @@ Each row of subplots contains three subplots, each representing a layer, with La
 In each subplot, the **x-axis** represents different ten **"neuron clusters"**. PCA is applied to reduce the dimensionality of each layer's activations from 4000 to 10. The **PCA projection matrices** are **aligned under the same layer in the same task**, but **differ across tasks** due to the nature of PCA. Note that the **last layer (Layer 2)** shows raw activation values **without PCA**, as it already consists of 10 dimensions. The **y-axis** represents the **input indices**, which are ordered by class index from top to bottom as class 0, class 1, ..., class 9. Each class contains 1000 samples.
 
 ##### SRC - Before, After, and Difference
+
+Each group of subplots shows the transitions of activations for each task. Here are brief explanations for each row:
+
+1. **Before SRC**: The activations right **after training** on the current task and **before applying the SRC algorithm**.
+2. **After SRC**: The activations right **after training** and **after applying the SRC algorithm**.
+3. **Synthetic**: This is a custom synthetic model created to verify our hypothesis. According to the authors' claim, SRC will *"strengthen important synaptic connections and prune irrelevant ones"*. This effect is very similar to a popular research topic in machine learning known as ***network pruning***. By using this simple synthetic model, we can get a glimpse of what SRC actually does. The synthetic model is created by the following process:
+   1. Take a snapshot of the weight of model **before training** on the current task, denoted as $W_{\text{before}}$.
+   2. Train the model on the current task. Then take another snapshot of the weight, denoted as $W_{\text{after}}$.
+   3. Apply the SRC algorithm to the model and get the new weight, denoted as $W_{\text{SRC}}$.
+   4. Calculate the difference between $W_{\text{after}}$ and $W_{\text{SRC}}$, denoted as $\Delta W_{\text{SRC}}$.
+
+    $$\Delta W_{\text{SRC}} = W_{\text{SRC}} - W_{\text{after}}$$
+
+   5. Finally, the weight of the synthetic model is calculated as follows:
+
+    $$W_{\text{synthetic}} = W_{\text{before}} + \Delta W_{\text{SRC}}$$
+
+    In our understanding, the $\Delta W_{\text{SRC}}$ should be a "compressed" version of the modification of task training. Although it doesn't seem that simple?
+    We then use the $W_{\text{synthetic}}$ initialized the synthetic model.
+4. **Difference**: The difference between the activations **before and after SRC algorithm**. This is also used for observing the effect of SRC on the model.
 
 ![](./png/layer_activations_task_0_before_after_src.png)
 ![](./png/layer_activations_task_1_before_after_src.png)
