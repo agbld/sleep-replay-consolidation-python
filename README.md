@@ -28,6 +28,8 @@ The original implementation, [tmtadros/SleepReplayConsolidation](https://github.
 
 ## SRC Algorithm
 
+The following equations try to describe the SRC algorithm in a more detailed manner. All of the equations are based on my understanding of the original paper and the MATLAB implementation. Please note that these equations are **NOT official** and might not be 100% accurate.
+
 ### Update Rules
 
 #### Input Layer:
@@ -46,13 +48,18 @@ The original implementation, [tmtadros/SleepReplayConsolidation](https://github.
   - $h_{\ell-1}$: Activation from previous layer.
 
 #### Weight Update Rule:
-- The weights are updated iteratively using both increment and decrement factors:
-
-  $$W_{\ell}^{t+1} = W_{\ell}^{t} + \text{inc} \cdot h_{\ell} \times h_{\ell-1}^{\top} - \text{dec} \cdot h_{\ell} \times \left(1 - h_{\ell-1}^{\top}\right)$$
+- The weight delta $\Delta W_{\ell}$ is computed using both increment and decrement factors:
+  $$
+  \Delta W_{\ell} = \left( \text{inc} \cdot h_{\ell} \times h_{\ell-1}^{\top} \right) \odot W_{\ell}^{t} - \left( \text{dec} \cdot h_{\ell} \times \left(1 - h_{\ell-1}^{\top}\right) \right) \odot W_{\ell}^{t}
+  $$
   
   where:
   - $\text{inc}$: Increment factor,
   - $\text{dec}$: Decrement factor.
+- The weights are then updated iteratively as follows:
+  $$
+  W_{\ell}^{t+1} = W_{\ell}^{t} + \Delta W_{\ell}
+  $$
 
 ## Experiments
 
