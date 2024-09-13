@@ -9,8 +9,9 @@ The SRC algorithm is designed to mitigate catastrophic forgetting in artificial 
 The original implementation, [tmtadros/SleepReplayConsolidation](https://github.com/tmtadros/SleepReplayConsolidation.git), was written in MATLAB.
 
 <details>
-  <summary>TODO</summary>
-  
+  <summary>Research Notes</summary>
+
+#### TODO
 - [ ] Figure out the formula for `alpha` and `beta` in the SRC algorithm.
   - [ ] See the *Sleep Replay Consolidation (SRC) algorithm* section under the *Methods* section in the paper.
   - [ ] Also see [*Fast-classifying, high-accuracy spiking deep networks through weight and threshold balancing*](https://ieeexplore.ieee.org/document/7280696) (IJCNN 2015) for the exact scaling algorithm.
@@ -23,6 +24,9 @@ The original implementation, [tmtadros/SleepReplayConsolidation](https://github.
     * In a neural network (NN), there are two major types of parameters: weights and biases. Each of them plays a crucial role while learning. The optimizer used in the training phase will try its best to adjust both weights and biases to fit the current task.
     * According to observations, so far, SRC does the "recall" or "memory recovery" by **selectively adjusting the weights**. SRC seeks to find the best compromised weights across all tasks. However, the **bias distribution may shift across tasks** as well.
     * If the target tasks are somehow **"bias-sensitive"**, then SRC might **suffer from the "outdated" bias**, resulting in catastrophic forgetting again.
+
+#### Questions
+1. What decides whether we enable the bias in NN? eg. Phi-3.5 and Gemma 2 **disabled** bias but BERT-base was **enabled**.
 
 </details>
 
