@@ -4,6 +4,7 @@ import torch.optim as optim
 import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -156,12 +157,12 @@ class NeuronDeveloper():
         self.activations[subtitle] = [post - pre for post, pre in zip(self.activations[post_subtitle], self.activations[pre_subtitle])]
         return self.activations[subtitle]
 
-    def reduce(self, pca_components=None):
+    def reduce(self, reduction_method='tsne', components=[None, None, None]):
         # Get the number of layers from the first entry in activations
         num_layers = len(next(iter(self.activations.values())))
 
-        # Precompute PCA models for each layer except the last one
-        pca_models = [None] * num_layers
+        # Precompute models for each layer except the last one
+        reduction_models = [None] * num_layers
 
         # Pre-fetch all the activations for improved loop performance
         activations_values = {subtitle: [a.to(self.device) for a in activations] for subtitle, activations in self.activations.items()}
@@ -170,44 +171,44 @@ class NeuronDeveloper():
             # Concatenate activations across all subtitles for layer i
             layer_activations = [activation[i].cpu().numpy() for activation in activations_values.values()]
 
-            # Combine activations into a single array for PCA
+            # Combine activations into a single array for dimensionality reduction
             concat_activations = np.concatenate(layer_activations, axis=0)
 
-            if i == num_layers - 1:
-                # Skip PCA for the output layer (last layer)
-                for subtitle, activation in self.activations.items():
-                    if self.reduced_activations.get(subtitle) is None:
-                        self.reduced_activations[subtitle] = []
-
-                    # Append the original activation for the output layer
-                    self.reduced_activations[subtitle].append(activation[i].cpu().numpy())
-            else:
-                # Fit PCA model for this layer if pca_components is specified
-                if pca_components:
-                    if pca_models[i] is None:
-                        pca_models[i] = PCA(n_components=pca_components)
-                        pca_models[i].fit(concat_activations)
+            if components[i]:  # Only reduce if components are specified
+                if reduction_models[i] is None:
+                    if reduction_method == 'pca':
+                        reduction_models[i] = PCA(n_components=components[i])
+                        reduction_models[i].fit(concat_activations)
+                    elif reduction_method == 'tsne':
+                        # Note: t-SNE does not require a fit step, so we do fit_transform directly
+                        reduction_models[i] = TSNE(n_components=components[i], random_state=42)
+                        concat_activations = reduction_models[i].fit_transform(concat_activations)  # Apply t-SNE to the concatenated activations
                 
-                # Transform the activations for each subtitle
-                for subtitle, activation in self.activations.items():
-                    if self.reduced_activations.get(subtitle) is None:
-                        self.reduced_activations[subtitle] = []
+            # Transform the activations for each subtitle
+            for subtitle, activation in self.activations.items():
+                if self.reduced_activations.get(subtitle) is None:
+                    self.reduced_activations[subtitle] = []
 
-                    layer_activation = activation[i].cpu().numpy()
+                layer_activation = activation[i].cpu().numpy()
 
-                    if pca_components:
-                        # Apply PCA transformation if components are specified
-                        reduced_activation = pca_models[i].transform(layer_activation)
-                    else:
-                        # Otherwise, just append the original activation (no PCA)
-                        reduced_activation = layer_activation
+                if components[i]:
+                    if reduction_method == 'pca':
+                        reduced_activation = reduction_models[i].transform(layer_activation)
+                    elif reduction_method == 'tsne':
+                        # For t-SNE, the transformation happens on the full dataset, so you cannot apply it like PCA
+                        # Instead, the `concat_activations` are already reduced, so we split them back
+                        reduced_activation = concat_activations[:len(layer_activation)]
+                        concat_activations = concat_activations[len(layer_activation):]  # Update remaining activations
+                else:
+                    reduced_activation = layer_activation  # No dimensionality reduction
 
-                    # Append the reduced activation for the current layer
-                    self.reduced_activations[subtitle].append(reduced_activation)
+                # Append the reduced activation for the current layer
+                self.reduced_activations[subtitle].append(reduced_activation)
 
         return self.reduced_activations
+
     
-    def show(self, mean_pooling=False):
+    def render(self, plot_types: list = ['heatmap', 'heatmap', 'heatmap'], pooling_types=['mean', 'mean', 'mean']):
         num_layers = len(self.activations[list(self.activations.keys())[0]])
 
         fig, axs = plt.subplots(len(self.reduced_activations.keys()), 
@@ -215,30 +216,55 @@ class NeuronDeveloper():
                                 figsize=(num_layers * 6, 
                                          len(self.reduced_activations.keys()) * 4 + 1))
         
-        fig.suptitle(self.title, fontsize=18)
+        fig.suptitle(self.title, fontsize=24)
         fig.tight_layout(rect=[0, 0, 1, 0.96])
 
         for i in range(num_layers):
             if len(self.reduced_activations.keys()) == 1:
-                if mean_pooling:
-                    data = self.reduced_activations[list(self.reduced_activations.keys())[0]][i]
-                    pooled_data = data.reshape(10, 1000, 10).mean(axis=1)
+                # Do pooling if mean_pooling is True
+                data = self.reduced_activations[list(self.reduced_activations.keys())[0]][i]
+                pca_components = data.shape[1]
+                if pooling_types[i] == 'mean':
+                    pooled_data = data.reshape(-1, 1000, pca_components).mean(axis=1)
+                elif pooling_types[i] == 'none':
+                    pooled_data = data
+                
+                # Plot the figure according to the plot_types[i]
+                if plot_types[i] == 'heatmap':
                     im = axs[i].imshow(pooled_data, aspect='auto')
-                else:
-                    im = axs[i].imshow(self.reduced_activations[list(self.reduced_activations.keys())[0]][i], aspect='auto')
-                axs[i].set_title(list(self.reduced_activations.keys())[0] + f' - Layer {i}', fontsize=12)
+                elif plot_types[i] == 'scatter':
+                    if pca_components and pca_components != 2:
+                        print("Warning: pca_components is not 2. Scatter plot may not work as expected.")
+                    colors = np.repeat(np.arange(pooled_data.shape[0] // 1000), 1000)
+                    im = axs[i].scatter(pooled_data[:, 0], pooled_data[:, 1], c=colors, cmap='viridis')
+
+                axs[i].set_title(list(self.reduced_activations.keys())[0] + f' - Layer {i}', fontsize=18)
                 fig.colorbar(im, ax=axs[i])
             else:
                 for j, sub_title in enumerate(self.reduced_activations.keys()):
-                    if mean_pooling:
-                        data = self.reduced_activations[sub_title][i]
-                        pooled_data = data.reshape(10, 1000, 10).mean(axis=1)
+                    # Do pooling if mean_pooling is True
+                    data = self.reduced_activations[sub_title][i]
+                    pca_components = data.shape[1]
+                    if pooling_types[i] == 'mean':
+                        pooled_data = data.reshape(-1, 1000, pca_components).mean(axis=1)
+                    elif pooling_types[i] == 'none':
+                        pooled_data = data
+
+                    # Plot the figure according to the plot_types[i]
+                    if plot_types[i] == 'heatmap':
                         im = axs[j, i].imshow(pooled_data, aspect='auto')
-                    else:
-                        im = axs[j, i].imshow(self.reduced_activations[sub_title][i], aspect='auto')
-                    axs[j, i].set_title(sub_title + f' - Layer {i}', fontsize=12)
+                    elif plot_types[i] == 'scatter':
+                        if pca_components and pca_components != 2:
+                            print("Warning: pca_components is not 2. Scatter plot may not work as expected.")
+                        colors = np.repeat(np.arange(pooled_data.shape[0] // 1000), 1000)
+                        im = axs[j, i].scatter(pooled_data[:, 0], pooled_data[:, 1], c=colors, cmap='viridis')
+
+                    axs[j, i].set_title(sub_title + f' - Layer {i}', fontsize=18)
                     fig.colorbar(im, ax=axs[j, i])
 
+        # Adjust spacing between rows
+        plt.subplots_adjust(hspace=0.2)
+        
         self.fig = fig
 
     def save(self):
