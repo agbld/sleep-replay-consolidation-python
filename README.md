@@ -74,7 +74,7 @@ The `mnist_exp.py` script try to replicate the original experiment ([see here!](
 
 #### Accuracy
 
-![image](./results.jpg)
+![image](./results.png)
 
 #### Neuron Activity Visualization
 
