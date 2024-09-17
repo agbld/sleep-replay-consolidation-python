@@ -76,6 +76,22 @@ The `mnist_exp.py` script try to replicate the original experiment ([see here!](
 
 ![image](./results.png)
 
+#### Model Capacity Analysis
+
+We use the stable rank to approximate the model's capacity usage. The stable rank is calculated by the following formula:
+
+$$\text{Stable Rank of } W = \left( \frac{\|W\|_F}{\|W\|_2} \right)^2$$
+
+where $\|W\|_F$ is the Frobenius norm and $\|W\|_2$ is the spectral norm of the weight matrix $W$. Or, as I understand it, in a more intuitive way, the stable rank is calculated by dividing the total importance of the components in the weight matrix by the importance of the most significant component.
+
+By calculating the stable rank of the weight matrices of each layer, we can estimate how many components from the Singular Value Decomposition (SVD) contribute to the resulting weight matrix. The **higher the stable rank**, the more components are used, and thus the **more capacity might be used**.
+
+In our hypothesis, the SRC algorithm should be able to compress the capacity usage of the current task, resulting in a **lower stable rank** while still **maintaining performance on the current task**.
+
+The following figure shows the stable rank of each layer across different tasks.
+
+![image](./src-before-after-stable-rank.jpg)
+
 #### Neuron Activity Visualization
 
 The following visualizations show the activations for each model across different tasks in sequence.
@@ -102,8 +118,7 @@ Each group of subplots shows the transitions of activations for each task. Here 
 
       $$W_{\text{synthetic}} = W_{\text{before}} + \Delta W_{\text{SRC}}$$
 
-    In our understanding, the $\Delta W_{\text{SRC}}$ should be a "compressed" version of the modification of task training. Although it doesn't seem that simple?
-    We then use the $W_{\text{synthetic}}$ initialized the synthetic model.
+      We then use the $W_{\text{synthetic}}$ initialized the synthetic model.
 4. **Difference**: The difference between the activations **before and after SRC algorithm**. This is also used for observing the effect of SRC on the model.
 
 ![](./png/layer_activations_task_0_before_after_src.png)

@@ -222,7 +222,7 @@ class NeuronDeveloper():
             if len(self.reduced_activations.keys()) == 1:
                 if mean_pooling:
                     data = self.reduced_activations[list(self.reduced_activations.keys())[0]][i]
-                    pooled_data = data.reshape(10, 1000, 10).mean(axis=1)
+                    pooled_data = data.reshape(10, 1000, -1).mean(axis=1)
                     im = axs[i].imshow(pooled_data, aspect='auto')
                 else:
                     im = axs[i].imshow(self.reduced_activations[list(self.reduced_activations.keys())[0]][i], aspect='auto')
@@ -232,7 +232,7 @@ class NeuronDeveloper():
                 for j, sub_title in enumerate(self.reduced_activations.keys()):
                     if mean_pooling:
                         data = self.reduced_activations[sub_title][i]
-                        pooled_data = data.reshape(10, 1000, 10).mean(axis=1)
+                        pooled_data = data.reshape(10, 1000, -1).mean(axis=1)
                         im = axs[j, i].imshow(pooled_data, aspect='auto')
                     else:
                         im = axs[j, i].imshow(self.reduced_activations[sub_title][i], aspect='auto')
@@ -243,3 +243,26 @@ class NeuronDeveloper():
 
     def save(self):
         self.fig.savefig(self.output_path, bbox_inches='tight', facecolor='w')
+
+# Function to compute stable rank
+def compute_stable_rank(nn: SimpleNN):
+    stable_ranks = []
+
+    for idx, layer in enumerate(nn.layers):
+
+        weight_matrix = layer.weight.data
+
+        # Compute the Frobenius norm
+        fro_norm = torch.norm(weight_matrix, p='fro')
+        
+        # Compute the spectral norm (largest singular value)
+        with torch.no_grad():
+            singular_values = torch.linalg.svdvals(weight_matrix)
+            sigma_max = singular_values[0]
+        
+        # Compute the stable rank
+        stable_rank = (fro_norm / sigma_max) ** 2
+
+        stable_ranks.append(stable_rank.item())
+
+    return stable_ranks
