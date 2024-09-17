@@ -84,7 +84,7 @@ $$\text{Stable Rank of } W = \left( \frac{\|W\|_F}{\|W\|_2} \right)^2$$
 
 where $\|W\|_F$ is the Frobenius norm and $\|W\|_2$ is the spectral norm of the weight matrix $W$. Or, as I understand it, in a more intuitive way, the stable rank is calculated by dividing the total importance of the components in the weight matrix by the importance of the most significant component.
 
-By calculating the stable rank of the weight matrices of each layer, we can estimate how many components from the Singular Value Decomposition (SVD) contribute to the resulting weight matrix. The **higher the stable rank**, the more components are used, and thus the **more capacity might be used**.
+By calculating the stable rank of the weight matrices of each layer, we can estimate the effective rank of these matrices—that is, how many singular values significantly contribute to the weight matrix. A **higher stable rank** implies that the singular values are more uniformly distributed, indicating that more singular components are substantially influencing the matrix. Consequently, the model may be **utilizing more of its capacity**.
 
 In our hypothesis, the SRC algorithm should be able to compress the capacity usage of the current task, resulting in a **lower stable rank** while still **maintaining performance on the current task**.
 
