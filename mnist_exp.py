@@ -4,14 +4,12 @@ import torch
 import numpy as np
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 import pandas as pd
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
 import copy
 
 from utils.nn import SimpleNN, NeuronDeveloper
 from utils.nn import train_network, evaluate_all, evaluate_per_task, log_accuracy, compute_stable_rank
+from utils.sleep import sleep_phase
 from utils.task import create_class_task
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -65,102 +63,12 @@ opts = {
     'momentum': 0.5         # Momentum for SGD
 }
 
-nn_size_template = [784, 4000, 4000, 10]
+nn_size_template = [784, 1200, 1200, 10]
 
 mean_pooling = True
 
 #%%
 # Exp 1: Sleep Replay Consolidation (SRC)
-
-def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Tensor):
-    nn.eval()  # Set the network to evaluation mode (disabling dropout)
-
-    # [Differences from the original] 
-    # 1. Using a slightly different method for mask creation.
-    # 2. Using the mean of sampled X for each iteration instead of the entire X.
-    # Generate sleep input based on the mean of the input samples and a random mask.
-    sleep_input = np.zeros((num_iterations, X.shape[1]))
-    for i in range(num_iterations):
-        mask = np.random.choice([0, 1], size=X.shape[1], p=[1 - sleep_opts['mask_fraction'], sleep_opts['mask_fraction']])
-        sampled_X_for_iter = X[np.random.choice(X.shape[0], sleep_opts['samples_per_iter'])]
-        mean_sample = np.mean(sampled_X_for_iter, axis=0)
-        sleep_input[i] = mean_sample * mask
-    sleep_input = torch.Tensor(sleep_input).to(device)
-
-    nn_size = [nn.layers[0].in_features] + [layer.out_features for layer in nn.layers]
-
-    membrane_potentials = [torch.zeros(size).to(device) for size in nn_size]
-    spikes = [torch.zeros(size).to(device) for size in nn_size]
-    refrac_end = [torch.zeros(size).to(device) for size in nn_size]
-
-    with torch.no_grad():
-        with tqdm(total=num_iterations) as pbar:
-            for t in range(num_iterations):
-                # Create Poisson-distributed spikes from the input images
-                # The input is randomly spiked at each time step
-                rescale_factor = 1 / (sleep_opts['dt'] * sleep_opts['max_rate']) # Rescale factor based on maximum firing rate
-                spike_snapshots = torch.rand(nn_size[0]).to(device) * rescale_factor / 2 # Generate random spikes
-                input_spikes = (spike_snapshots <= sleep_input[t]).float() # Compare to sleep input to determine spikes
-
-                # Fisrt layer spikes are based on the input directly
-                spikes[0] = torch.Tensor(input_spikes).to(device)
-
-                # Update the membrane potentials and spikes for each layer (starting from second layer)
-                for l in range(1, len(nn_size)):
-
-                    # Compute the input impulse based on spikes from the previous layer, update membrane potentials
-                    impulse = nn.layers[l - 1](spikes[l - 1]) * sleep_opts['alpha'][l - 1]
-                    impulse = impulse - torch.mean(impulse) * sleep_opts['W_inh'] # Apply inhibition
-                    membrane_potentials[l] = membrane_potentials[l] * sleep_opts['decay'] + impulse
-
-                    # Add a direct current (DC) component for layer 4, if needed
-                    if l == len(nn_size) - 1:
-                        membrane_potentials[l] += sleep_opts['DC']
-                    
-                    # Update spiking state based on membrane potential and threshold
-                    threshold = sleep_opts['threshold'] * sleep_opts['beta'][l - 1]
-                    spikes[l] = torch.Tensor((membrane_potentials[l] >= threshold).float())
-
-                    # Spike-Timing Dependent Plasticity (STDP) to adjust weights
-                    def stdp(weight, pre, post):
-                        # Compute the weight delta using broadcasting
-                        sigmoid_weights = torch.sigmoid(weight)
-
-                        # Compute the weight delta using broadcasting
-                        weight_inc = sleep_opts['inc'] * (post == 1) * (pre == 1) * sigmoid_weights
-                        weight_dec = sleep_opts['dec'] * (post == 1) * (pre == 0) * sigmoid_weights
-
-                        # Combine increments and decrements
-                        return weight_inc - weight_dec
-
-                    # Get pre-synaptic spikes and post-synaptic spikes
-                    pre = spikes[l - 1].unsqueeze(0)  # (num_pre_neurons,) -> (1, num_pre_neurons)
-                    post = spikes[l].unsqueeze(1)  # (num_post_neurons,) -> (num_post_neurons, 1)
-                    
-                    # Compute the weight delta
-                    weight_delta = stdp(nn.layers[l - 1].weight, pre, post)
-
-                    # Update weights
-                    nn.layers[l - 1].weight += weight_delta
-
-                    # Reset the membrane potential of spiking neurons
-                    membrane_potentials[l][spikes[l] == 1] = 0
-
-                    # Update the refractory period for spiking neurons
-                    refrac_end[l][spikes[l] == 1] = t + sleep_opts['t_ref']
-
-                pbar.update(1)
-
-            # avg_spikes = [total / num_iterations for total in total_spikes]
-            # print(avg_spikes)
-
-            # Normalize weights if required by sleep_opts
-            if sleep_opts['normW'] == 1:
-                for l in range(1, len(nn_size)):
-                    nn.layers[l - 1].weight = sleep_opts['gamma'] * nn.layers[l - 1].weight / (torch.max(nn.layers[l - 1].weight) - torch.min(nn.layers[l - 1].weight)) * \
-                        (torch.max(sleep_opts['W_old'][l - 1]) - torch.min(sleep_opts['W_old'][l - 1]))
-                
-    return nn
 
 def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
@@ -208,7 +116,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
         task_train_y = train_y[task_indices[:5000]]
         
-        model_before_training = copy.deepcopy(src_model)
+        model_before_training = copy.deepcopy(src_model) # Take a snapshot of the model before training (for synthetic model creation)
         src_model = train_network(src_model, task_train_x, task_train_y, opts)
 
         # [Visual] Record activations before SRC for layer visualization
@@ -227,7 +135,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         # Run the sleep phase (with gradual increase in the number of iterations)
         sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
-        model_before_src = copy.deepcopy(src_model)
+        model_before_src = copy.deepcopy(src_model) # Take a snapshot of the model before SRC (for synthetic model creation)
         src_model = sleep_phase(src_model, sleep_period, sleep_opts, task_train_x)
         
         print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))

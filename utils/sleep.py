@@ -2,6 +2,102 @@ from utils.nn import SimpleNN
 import torch
 import numpy as np
 import warnings
+import copy
+from tqdm import tqdm
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Tensor, device: torch.device = device) -> SimpleNN:
+    nn = copy.deepcopy(nn)  # Create a deep copy of the network to avoid modifying the original network
+
+    nn.eval()  # Set the network to evaluation mode (disabling dropout)
+
+    # [Differences from the original] 
+    # 1. Using a slightly different method for mask creation.
+    # 2. Using the mean of sampled X for each iteration instead of the entire X.
+    # Generate sleep input based on the mean of the input samples and a random mask.
+    sleep_input = np.zeros((num_iterations, X.shape[1]))
+    for i in range(num_iterations):
+        mask = np.random.choice([0, 1], size=X.shape[1], p=[1 - sleep_opts['mask_fraction'], sleep_opts['mask_fraction']])
+        sampled_X_for_iter = X[np.random.choice(X.shape[0], sleep_opts['samples_per_iter'])]
+        mean_sample = np.mean(sampled_X_for_iter, axis=0)
+        sleep_input[i] = mean_sample * mask
+    sleep_input = torch.Tensor(sleep_input).to(device)
+
+    nn_size = [nn.layers[0].in_features] + [layer.out_features for layer in nn.layers]
+
+    membrane_potentials = [torch.zeros(size).to(device) for size in nn_size]
+    spikes = [torch.zeros(size).to(device) for size in nn_size]
+    refrac_end = [torch.zeros(size).to(device) for size in nn_size]
+
+    with torch.no_grad():
+        with tqdm(total=num_iterations) as pbar:
+            for t in range(num_iterations):
+                # Create Poisson-distributed spikes from the input images
+                # The input is randomly spiked at each time step
+                rescale_factor = 1 / (sleep_opts['dt'] * sleep_opts['max_rate']) # Rescale factor based on maximum firing rate
+                spike_snapshots = torch.rand(nn_size[0]).to(device) * rescale_factor / 2 # Generate random spikes
+                input_spikes = (spike_snapshots <= sleep_input[t]).float() # Compare to sleep input to determine spikes
+
+                # Fisrt layer spikes are based on the input directly
+                spikes[0] = torch.Tensor(input_spikes).to(device)
+
+                # Update the membrane potentials and spikes for each layer (starting from second layer)
+                for l in range(1, len(nn_size)):
+
+                    # Compute the input impulse based on spikes from the previous layer, update membrane potentials
+                    impulse = nn.layers[l - 1](spikes[l - 1]) * sleep_opts['alpha'][l - 1]
+                    impulse = impulse - torch.mean(impulse) * sleep_opts['W_inh'] # Apply inhibition
+                    membrane_potentials[l] = membrane_potentials[l] * sleep_opts['decay'] + impulse
+
+                    # Add a direct current (DC) component for layer 4, if needed
+                    if l == len(nn_size) - 1:
+                        membrane_potentials[l] += sleep_opts['DC']
+                    
+                    # Update spiking state based on membrane potential and threshold
+                    threshold = sleep_opts['threshold'] * sleep_opts['beta'][l - 1]
+                    spikes[l] = torch.Tensor((membrane_potentials[l] >= threshold).float())
+
+                    # Spike-Timing Dependent Plasticity (STDP) to adjust weights
+                    def stdp(weight, pre, post):
+                        # Compute the weight delta using broadcasting
+                        sigmoid_weights = torch.sigmoid(weight)
+
+                        # Compute the weight delta using broadcasting
+                        weight_inc = sleep_opts['inc'] * (post == 1) * (pre == 1) * sigmoid_weights
+                        weight_dec = sleep_opts['dec'] * (post == 1) * (pre == 0) * sigmoid_weights
+
+                        # Combine increments and decrements
+                        return weight_inc - weight_dec
+
+                    # Get pre-synaptic spikes and post-synaptic spikes
+                    pre = spikes[l - 1].unsqueeze(0)  # (num_pre_neurons,) -> (1, num_pre_neurons)
+                    post = spikes[l].unsqueeze(1)  # (num_post_neurons,) -> (num_post_neurons, 1)
+                    
+                    # Compute the weight delta
+                    weight_delta = stdp(nn.layers[l - 1].weight, pre, post)
+
+                    # Update weights
+                    nn.layers[l - 1].weight += weight_delta
+
+                    # Reset the membrane potential of spiking neurons
+                    membrane_potentials[l][spikes[l] == 1] = 0
+
+                    # Update the refractory period for spiking neurons
+                    refrac_end[l][spikes[l] == 1] = t + sleep_opts['t_ref']
+
+                pbar.update(1)
+
+            # avg_spikes = [total / num_iterations for total in total_spikes]
+            # print(avg_spikes)
+
+            # Normalize weights if required by sleep_opts
+            if sleep_opts['normW'] == 1:
+                for l in range(1, len(nn_size)):
+                    nn.layers[l - 1].weight = sleep_opts['gamma'] * nn.layers[l - 1].weight / (torch.max(nn.layers[l - 1].weight) - torch.min(nn.layers[l - 1].weight)) * \
+                        (torch.max(sleep_opts['W_old'][l - 1]) - torch.min(sleep_opts['W_old'][l - 1]))
+                
+    return nn
 
 def create_masked_input(X, numexamples, mask_size):
     warnings.warn("create_masked_input is deprecated and will be removed in a future version.", DeprecationWarning)
