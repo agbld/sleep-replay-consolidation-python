@@ -90,7 +90,7 @@ In our hypothesis, the SRC algorithm should be able to compress the capacity usa
 
 The following figure shows the stable rank of each layer across different tasks.
 
-![image](./src-before-after-stable-rank.jpg)
+![image](./png/src-before-after-stable-rank.jpg)
 
 #### Neuron Activity Visualization
 
