@@ -63,7 +63,7 @@ opts = {
     'momentum': 0.5         # Momentum for SGD
 }
 
-nn_size_template = [784, 1200, 1200, 10]
+nn_size_template = [784, 4000, 4000, 10]
 
 mean_pooling = True
 
@@ -103,6 +103,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     print(sleep_opts)
 
     sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+    print("Stable Ranks:", sleep_opts['stable_ranks'])
     acc_df = log_accuracy(f'SRC', 'Initial', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
     for task_id in range(num_tasks):
@@ -126,6 +127,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
         sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        print("Stable Ranks:", sleep_opts['stable_ranks'])
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
         # Calculate the alpha
@@ -140,6 +142,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         
         print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
         sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        print("Stable Ranks:", sleep_opts['stable_ranks'])
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
         # [Visual] Record activations after SRC and calculate the difference
@@ -154,6 +157,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         print('Synthetic SRC: ', evaluate_per_task(model_synthetic, test_x, test_y, test_tasks, num_tasks))
         sleep_opts['stable_ranks'] = [compute_stable_rank(src_model)]
+        print("Stable Ranks:", sleep_opts['stable_ranks'])
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Synthetic SRC', acc_df, model_synthetic, test_x, test_y, test_tasks, sleep_opts)
 
         # [Visual] Record activations for the synthetic model
@@ -170,6 +174,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         neuron_developer.save()
 
     sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+    print("Stable Ranks:", sleep_opts['stable_ranks'])
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
 
     print(evaluate_all(src_model, test_x, test_y))
