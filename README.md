@@ -8,6 +8,21 @@ The SRC algorithm is designed to mitigate catastrophic forgetting in artificial 
 
 The original implementation, [tmtadros/SleepReplayConsolidation](https://github.com/tmtadros/SleepReplayConsolidation.git), was written in MATLAB.
 
+## Installation
+
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/agbld/sleep-replay-consolidation-python.git
+    cd sleep-replay-consolidation-python
+    ```
+
+2. Make sure you have PyTorch installed. You can find the installation instructions on the [official PyTorch website](https://pytorch.org/get-started/locally/).
+
+3. Install the required packages:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
 <details>
   <summary>Research Notes</summary>
 
