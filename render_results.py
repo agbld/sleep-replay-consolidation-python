@@ -1,5 +1,6 @@
 #%%
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import Normalize
@@ -40,8 +41,8 @@ for key, cell in table.get_celld().items():
 
 # Color formatting for task columns based on value
 task_cols = [df.columns.get_loc(col) for col in df.columns if 'Task' in col or col == 'All']
-for (i, j), val in pd.np.ndenumerate(df.values):
-    if j in task_cols and pd.np.isreal(val):
+for (i, j), val in np.ndenumerate(df.values):
+    if j in task_cols and np.isreal(val):
         color = color_map(norm(val) - 0.4)
         table[(i+1, j)].set_facecolor(color)
         table[(i+1, j)].set_text_props(color='black') # if val > 50 else 'white')
