@@ -22,15 +22,11 @@ transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5
 train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
 test_dataset = datasets.MNIST(root='./data', train=False, transform=transform)
 
-# Convert datasets to DataLoader for batch processing
-train_loader = DataLoader(train_dataset, batch_size=100, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False)
-
 # Convert to numpy format for task generation (optional)
-train_x = train_dataset.data.numpy().reshape(-1, 784).astype(np.float32) / 255
-train_y = train_dataset.targets.numpy()
-test_x = test_dataset.data.numpy().reshape(-1, 784).astype(np.float32) / 255
-test_y = test_dataset.targets.numpy()
+train_X = train_dataset.data.numpy().reshape(-1, 784).astype(np.float32) / 255
+train_Y = train_dataset.targets.numpy()
+test_X = test_dataset.data.numpy().reshape(-1, 784).astype(np.float32) / 255
+test_Y = test_dataset.targets.numpy()
 
 #%%
 # Task Generation
@@ -39,13 +35,21 @@ num_tasks = 5
 task_size = (10 + num_tasks - 1) // num_tasks
 print(f'Number of Tasks: {num_tasks}')
 print(f'Task Size: {task_size}')
-train_X_list, train_Y_list = create_class_task(train_x, train_y, num_tasks, task_size)
-test_X_list, test_Y_list = create_class_task(test_x, test_y, num_tasks, task_size)
+train_X_list, train_Y_list = create_class_task(train_X, train_Y, task_size, num_tasks)
+test_X_list, test_Y_list = create_class_task(test_X, test_Y, task_size, num_tasks)
 
-train_X_cat = np.concatenate(train_X_list)
-train_Y_cat = np.concatenate(train_Y_list)
-test_X_cat = np.concatenate(test_X_list)
-test_Y_cat = np.concatenate(test_Y_list)
+# Keep only the first 5000 samples for each task
+for i in range(num_tasks):
+    train_X_list[i] = train_X_list[i][:5000]
+    train_Y_list[i] = train_Y_list[i][:5000]
+
+# Create sequential x for visualization
+train_X_sequential = []
+for i in range(10):
+    class_id = np.where(train_Y == i)[0]
+    X_class = train_X[class_id[:1000]]
+    train_X_sequential.append(X_class)
+train_X_sequential = np.concatenate(train_X_sequential)
 
 #%%
 # Configuration
@@ -98,8 +102,8 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     sleep_opts.update(sleep_opts_update)
     print(sleep_opts)
 
-    sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-    print("Stable Ranks:", sleep_opts['stable_ranks'])
+    # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+    # print("Stable Ranks:", sleep_opts['stable_ranks'])
     acc_df = log_accuracy(f'SRC', 'Initial', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
     for task_id in range(num_tasks):
@@ -110,19 +114,19 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
                                            output_path=f'./png/layer_activations_task_{task_id}_before_after_src.png')
 
         train_X_task = train_X_list[task_id]
-        train_X_task = train_Y_list[task_id]
+        train_Y_task = train_Y_list[task_id]
         
-        model_before_training = copy.deepcopy(src_model) # Take a snapshot of the model before training (for synthetic model creation)
-        src_model = train_network(src_model, train_X_task, train_X_task, opts)
+        # model_before_training = copy.deepcopy(src_model) # Take a snapshot of the model before training (for synthetic model creation)
+        src_model = train_network(src_model, train_X_task, train_Y_task, opts)
 
         # [Visual] Record activations before SRC for layer visualization
         neuron_developer.record(src_model, 
-                                train_X_cat, 
+                                train_X_sequential, 
                                 'Before SRC')
 
         print('Before SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
-        sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-        print("Stable Ranks:", sleep_opts['stable_ranks'])
+        # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        # print("Stable Ranks:", sleep_opts['stable_ranks'])
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
         # Calculate the alpha
@@ -132,31 +136,31 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         # Run the sleep phase (with gradual increase in the number of iterations)
         sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
-        model_before_src = copy.deepcopy(src_model) # Take a snapshot of the model before SRC (for synthetic model creation)
+        # model_before_src = copy.deepcopy(src_model) # Take a snapshot of the model before SRC (for synthetic model creation)
         src_model = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task)
         
         print('After SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
-        sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-        print("Stable Ranks:", sleep_opts['stable_ranks'])
+        # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        # print("Stable Ranks:", sleep_opts['stable_ranks'])
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
         # [Visual] Record activations after SRC and calculate the difference
-        neuron_developer.record(src_model, train_X_cat, 'After SRC')
+        neuron_developer.record(src_model, train_X_sequential, 'After SRC')
 
-        # Create a synthetic model by using the model_before_training + (src_model - model_before_src)
-        model_synthetic = SimpleNN(nn_size_template).to(device)
-        with torch.no_grad():
-            for i, layer in enumerate(model_synthetic.layers):
-                with torch.no_grad():
-                    layer.weight = torch.nn.Parameter(model_before_training.layers[i].weight + (src_model.layers[i].weight - model_before_src.layers[i].weight))
+        # # Create a synthetic model by using the model_before_training + (src_model - model_before_src)
+        # model_synthetic = SimpleNN(nn_size_template).to(device)
+        # with torch.no_grad():
+        #     for i, layer in enumerate(model_synthetic.layers):
+        #         with torch.no_grad():
+        #             layer.weight = torch.nn.Parameter(model_before_training.layers[i].weight + (src_model.layers[i].weight - model_before_src.layers[i].weight))
 
-        print('Synthetic SRC: ', evaluate_per_task(model_synthetic, test_X_list, test_Y_list))
-        sleep_opts['stable_ranks'] = [compute_stable_rank(src_model)]
-        print("Stable Ranks:", sleep_opts['stable_ranks'])
-        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Synthetic SRC', acc_df, model_synthetic, test_X_list, test_Y_list, sleep_opts)
+        # print('Synthetic SRC: ', evaluate_per_task(model_synthetic, test_X_list, test_Y_list))
+        # sleep_opts['stable_ranks'] = [compute_stable_rank(src_model)]
+        # print("Stable Ranks:", sleep_opts['stable_ranks'])
+        # acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Synthetic SRC', acc_df, model_synthetic, test_X_list, test_Y_list, sleep_opts)
 
-        # [Visual] Record activations for the synthetic model
-        neuron_developer.record(model_synthetic, train_X_cat, 'Synthetic SRC')
+        # # [Visual] Record activations for the synthetic model
+        # neuron_developer.record(model_synthetic, train_X_cat, 'Synthetic SRC')
 
         # [Visual] Record the difference between the activations before and after SRC
         neuron_developer.record_diff('After SRC', 'Before SRC', 'Difference')
@@ -168,11 +172,11 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         neuron_developer.show(mean_pooling)
         neuron_developer.save()
 
-    sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-    print("Stable Ranks:", sleep_opts['stable_ranks'])
+    # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+    # print("Stable Ranks:", sleep_opts['stable_ranks'])
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
-    print(evaluate_all(src_model, test_X_cat, test_Y_cat))
+    print(evaluate_all(src_model, test_X, test_Y))
 
     return acc_df
 
@@ -203,16 +207,15 @@ neuron_developer = NeuronDeveloper(title=f'Layer Activations: Merging',
 for task_id in range(num_tasks):
 
     task_model = SimpleNN(nn_size_template).to(device)
-    task_indices = np.where(train_tasks == task_id)[0]
-    task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
-    task_train_y = train_y[task_indices[:5000]]
-    acc_df = log_accuracy('Merging', 'Task ' + str(task_id) + ' Initial', acc_df, task_model, test_x, test_y, test_tasks)
-    task_model = train_network(task_model, task_train_x, task_train_y, opts)
-    print(evaluate_per_task(task_model, test_x, test_y, test_tasks, num_tasks))
-    acc_df = log_accuracy('Merging', 'Task ' + str(task_id), acc_df, task_model, test_x, test_y, test_tasks)
+    train_X_task = train_X_list[task_id]
+    train_Y_task = train_Y_list[task_id]
+    acc_df = log_accuracy('Merging', 'Task ' + str(task_id) + ' Initial', acc_df, task_model, test_X_list, test_Y_list)
+    task_model = train_network(task_model, train_X_task, train_Y_task, opts)
+    print(evaluate_per_task(task_model, test_X_list, test_Y_list))
+    acc_df = log_accuracy('Merging', 'Task ' + str(task_id), acc_df, task_model, test_X_list, test_Y_list)
 
     # [Visual] Record activations layer visualization
-    neuron_developer.record(task_model, sequential_train_x, 'Task ' + str(task_id) + ' Model')
+    neuron_developer.record(task_model, train_X_sequential, 'Task ' + str(task_id) + ' Model')
 
     task_models.append(task_model)
 
@@ -230,12 +233,12 @@ for task_model in task_models:
             if layer.bias is not None:
                 merged_model.layers[i].bias += layer.bias / num_tasks
 
-acc_df = log_accuracy('Merging', 'Merged', acc_df, merged_model, test_x, test_y, test_tasks)
-print(evaluate_per_task(merged_model, test_x, test_y, test_tasks, num_tasks))
-print(evaluate_all(merged_model, test_x, test_y))
+acc_df = log_accuracy('Merging', 'Merged', acc_df, merged_model, test_X_list, test_Y_list)
+print(evaluate_per_task(merged_model, test_X_list, test_Y_list))
+print(evaluate_all(merged_model, test_X, test_Y))
 
 # [Visual] Record activations layer visualization
-neuron_developer.record(merged_model, sequential_train_x, 'Merged')
+neuron_developer.record(merged_model, train_X_sequential, 'Merged')
 
 # [Visual] Reduce the dimensionality of the activations using PCA
 neuron_developer.reduce(pca_components=10)
@@ -248,7 +251,7 @@ neuron_developer.save()
 # Exp 3: Sequential Training
 control_model = SimpleNN(nn_size_template).to(device)
 
-acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_x, test_y, test_tasks)
+acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_X_list, test_Y_list)
 
 for task_id in range(num_tasks):
 
@@ -256,18 +259,17 @@ for task_id in range(num_tasks):
     neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Sequential',
                                        output_path=f'./png/layer_activations_task_{task_id}_sequential.png')
     
-    task_indices = np.where(train_tasks == task_id)[0]
-    task_train_x = train_x[task_indices[:5000]]  # Train on the first 5000 samples for each task
-    task_train_y = train_y[task_indices[:5000]]
+    train_X_task = train_X_list[task_id]
+    train_Y_task = train_Y_list[task_id]
     
-    control_model = train_network(control_model, task_train_x, task_train_y, opts)
+    control_model = train_network(control_model, train_X_task, train_Y_task, opts)
 
-    print(evaluate_per_task(control_model, test_x, test_y, test_tasks, num_tasks))
+    print(evaluate_per_task(control_model, test_X_list, test_Y_list))
 
-    acc_df = log_accuracy('Sequential', 'Task ' + str(task_id), acc_df, control_model, test_x, test_y, test_tasks)
+    acc_df = log_accuracy('Sequential', 'Task ' + str(task_id), acc_df, control_model, test_X_list, test_Y_list)
 
     # [Visual] Record activations layer visualization
-    neuron_developer.record(control_model, sequential_train_x, 'Sequential')
+    neuron_developer.record(control_model, train_X_sequential, 'Sequential')
 
     # [Visual] Reduce the dimensionality of the activations using PCA
     neuron_developer.reduce(pca_components=10)
@@ -276,9 +278,9 @@ for task_id in range(num_tasks):
     neuron_developer.show(mean_pooling)
     neuron_developer.save()
 
-acc_df = log_accuracy('Sequential', 'After Training', acc_df, control_model, test_x, test_y, test_tasks)
+acc_df = log_accuracy('Sequential', 'After Training', acc_df, control_model, test_X_list, test_Y_list)
 
-print(evaluate_all(control_model, test_x, test_y))
+print(evaluate_all(control_model, test_X, test_Y))
 
 #%%
 # Exp 4: Parallel Training
@@ -288,17 +290,17 @@ parallel_model = SimpleNN(nn_size_template).to(device)
 neuron_developer = NeuronDeveloper(title=f'Layer Activations: Parallel',
                                    output_path=f'./png/layer_activations_parallel.png')
 
-acc_df = log_accuracy('Parallel', 'Initial', acc_df, parallel_model, test_x, test_y, test_tasks)
+acc_df = log_accuracy('Parallel', 'Initial', acc_df, parallel_model, test_X_list, test_Y_list)
 
-train_network(parallel_model, train_x, train_y, opts)
+train_network(parallel_model, train_X, train_Y, opts)
 
-acc_df = log_accuracy('Parallel', 'After Training', acc_df, parallel_model, test_x, test_y, test_tasks)
+acc_df = log_accuracy('Parallel', 'After Training', acc_df, parallel_model, test_X_list, test_Y_list)
 
-print(evaluate_per_task(parallel_model, test_x, test_y, test_tasks, num_tasks))
-print(evaluate_all(parallel_model, test_x, test_y))
+print(evaluate_per_task(parallel_model, test_X_list, test_Y_list))
+print(evaluate_all(parallel_model, test_X, test_Y))
 
 # [Visual] Record activations layer visualization
-neuron_developer.record(parallel_model, sequential_train_x, 'Parallel')
+neuron_developer.record(parallel_model, train_X_sequential, 'Parallel')
 
 # [Visual] Reduce the dimensionality of the activations using PCA
 neuron_developer.reduce(pca_components=10)
