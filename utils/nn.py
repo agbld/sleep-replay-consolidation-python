@@ -5,6 +5,7 @@ import numpy as np
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -22,7 +23,7 @@ class SimpleNN(nn.Module):
         x = self.layers[-1](x)
         return x
 
-def train_network(model, train_x, train_y, opts):
+def train_network(model, train_x, train_y, opts, verbose=False):
     model.train()
     optimizer = optim.SGD(model.parameters(), lr=opts['learning_rate'], momentum=opts['momentum'])
     criterion = nn.CrossEntropyLoss()
@@ -32,14 +33,16 @@ def train_network(model, train_x, train_y, opts):
     dataset = TensorDataset(torch.tensor(train_x), torch.tensor(train_y, dtype=torch.long))
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
-    for epoch in range(num_epochs):
-        for batch_idx, (data, target) in enumerate(loader):
-            data, target = data.to(torch.device(device)), target.to(torch.device(device))
-            optimizer.zero_grad()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
+    with tqdm(total=num_epochs * len(loader), disable=not verbose) as pbar:
+        for epoch in range(num_epochs):
+            for batch_idx, (data, target) in enumerate(loader):
+                data, target = data.to(torch.device(device)), target.to(torch.device(device))
+                optimizer.zero_grad()
+                output = model(data)
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
+                pbar.update(1)
 
     return model
 
