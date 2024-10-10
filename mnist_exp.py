@@ -39,17 +39,13 @@ num_tasks = 5
 task_size = (10 + num_tasks - 1) // num_tasks
 print(f'Number of Tasks: {num_tasks}')
 print(f'Task Size: {task_size}')
-train_tasks = create_class_task(train_y, task_size)
-test_tasks = create_class_task(test_y, task_size)
+train_X_list, train_Y_list = create_class_task(train_x, train_y, num_tasks, task_size)
+test_X_list, test_Y_list = create_class_task(test_x, test_y, num_tasks, task_size)
 
-sequential_train_x = []
-
-for i in range(10):
-    task_indices = np.where(train_y == i)[0]
-    task_train_x = train_x[task_indices[:1000]]  # Use the first 5000 samples for each task
-    sequential_train_x.append(task_train_x)
-
-sequential_train_x = np.concatenate(sequential_train_x)
+train_X_cat = np.concatenate(train_X_list)
+train_Y_cat = np.concatenate(train_Y_list)
+test_X_cat = np.concatenate(test_X_list)
+test_Y_cat = np.concatenate(test_Y_list)
 
 #%%
 # Configuration
@@ -104,7 +100,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
     print("Stable Ranks:", sleep_opts['stable_ranks'])
-    acc_df = log_accuracy(f'SRC', 'Initial', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
+    acc_df = log_accuracy(f'SRC', 'Initial', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
     for task_id in range(num_tasks):
         print(f'Task {task_id}')
@@ -113,22 +109,21 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Before, After SRC, and Difference',
                                            output_path=f'./png/layer_activations_task_{task_id}_before_after_src.png')
 
-        task_indices = np.where(train_tasks == task_id)[0]
-        task_train_x = train_x[task_indices[:5000]]  # Use the first 5000 samples for each task
-        task_train_y = train_y[task_indices[:5000]]
+        train_X_task = train_X_list[task_id]
+        train_X_task = train_Y_list[task_id]
         
         model_before_training = copy.deepcopy(src_model) # Take a snapshot of the model before training (for synthetic model creation)
-        src_model = train_network(src_model, task_train_x, task_train_y, opts)
+        src_model = train_network(src_model, train_X_task, train_X_task, opts)
 
         # [Visual] Record activations before SRC for layer visualization
         neuron_developer.record(src_model, 
-                                sequential_train_x, 
+                                train_X_cat, 
                                 'Before SRC')
 
-        print('Before SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
+        print('Before SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
         sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
         print("Stable Ranks:", sleep_opts['stable_ranks'])
-        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
+        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
         # Calculate the alpha
         # _, factor_log = normalize_nn_data(src_model, task_train_x)
@@ -138,15 +133,15 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         # Run the sleep phase (with gradual increase in the number of iterations)
         sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
         model_before_src = copy.deepcopy(src_model) # Take a snapshot of the model before SRC (for synthetic model creation)
-        src_model = sleep_phase(src_model, sleep_period, sleep_opts, task_train_x)
+        src_model = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task)
         
-        print('After SRC: ', evaluate_per_task(src_model, test_x, test_y, test_tasks, num_tasks))
+        print('After SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
         sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
         print("Stable Ranks:", sleep_opts['stable_ranks'])
-        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
+        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
         # [Visual] Record activations after SRC and calculate the difference
-        neuron_developer.record(src_model, sequential_train_x, 'After SRC')
+        neuron_developer.record(src_model, train_X_cat, 'After SRC')
 
         # Create a synthetic model by using the model_before_training + (src_model - model_before_src)
         model_synthetic = SimpleNN(nn_size_template).to(device)
@@ -155,13 +150,13 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
                 with torch.no_grad():
                     layer.weight = torch.nn.Parameter(model_before_training.layers[i].weight + (src_model.layers[i].weight - model_before_src.layers[i].weight))
 
-        print('Synthetic SRC: ', evaluate_per_task(model_synthetic, test_x, test_y, test_tasks, num_tasks))
+        print('Synthetic SRC: ', evaluate_per_task(model_synthetic, test_X_list, test_Y_list))
         sleep_opts['stable_ranks'] = [compute_stable_rank(src_model)]
         print("Stable Ranks:", sleep_opts['stable_ranks'])
-        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Synthetic SRC', acc_df, model_synthetic, test_x, test_y, test_tasks, sleep_opts)
+        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Synthetic SRC', acc_df, model_synthetic, test_X_list, test_Y_list, sleep_opts)
 
         # [Visual] Record activations for the synthetic model
-        neuron_developer.record(model_synthetic, sequential_train_x, 'Synthetic SRC')
+        neuron_developer.record(model_synthetic, train_X_cat, 'Synthetic SRC')
 
         # [Visual] Record the difference between the activations before and after SRC
         neuron_developer.record_diff('After SRC', 'Before SRC', 'Difference')
@@ -175,9 +170,9 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
     print("Stable Ranks:", sleep_opts['stable_ranks'])
-    acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_x, test_y, test_tasks, sleep_opts)
+    acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
-    print(evaluate_all(src_model, test_x, test_y))
+    print(evaluate_all(src_model, test_X_cat, test_Y_cat))
 
     return acc_df
 

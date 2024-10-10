@@ -43,12 +43,12 @@ def train_network(model, train_x, train_y, opts):
 
     return model
 
-def evaluate_all(model, test_x, test_y):
+def evaluate_all(model, X, Y):
     model.eval()  # Set the model to evaluation mode
     correct = 0
     total = 0
     
-    dataset = TensorDataset(torch.tensor(test_x), torch.tensor(test_y, dtype=torch.long))
+    dataset = TensorDataset(torch.tensor(X), torch.tensor(Y, dtype=torch.long))
     loader = DataLoader(dataset, batch_size=100, shuffle=False)
     
     with torch.no_grad():  # Disable gradient calculations
@@ -63,17 +63,19 @@ def evaluate_all(model, test_x, test_y):
     # print(f'Accuracy All: {accuracy:.2f}%')
     return accuracy
 
-def evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks):
+def evaluate_per_task(model, X_list, Y_list):
     model.eval()  # Set the model to evaluation mode
     accuracies = {}
+    num_tasks = len(X_list)
+    if num_tasks != len(Y_list):
+        raise ValueError('Number of task inputs and outputs must match')
     
     # Evaluate accuracy for each task
     with torch.no_grad():
         for task_id in range(num_tasks):
             # Get the indices of the examples for the current task
-            task_indices = np.where(test_tasks == task_id)[0]
-            task_test_x = test_x[task_indices]
-            task_test_y = test_y[task_indices]
+            task_test_x = X_list[task_id]
+            task_test_y = Y_list[task_id]
             
             # Create a DataLoader for this task's data
             dataset = TensorDataset(torch.tensor(task_test_x), torch.tensor(task_test_y, dtype=torch.long))
@@ -94,13 +96,13 @@ def evaluate_per_task(model, test_x, test_y, test_tasks, num_tasks):
     
     return accuracies
 
-def log_accuracy(approach: str, stage: str, acc_df: list, model: SimpleNN, test_x, test_y, test_tasks, args: dict = {}):
+def log_accuracy(approach: str, stage: str, acc_df: list, model: SimpleNN, X_list, Y_list, args: dict = {}):
     acc_dict = {}
     acc_dict['Approach'] = approach
     acc_dict['Stage'] = stage
     acc_dict.update(args)
-    acc_dict.update(evaluate_per_task(model, test_x, test_y, test_tasks, len(set(test_tasks))))
-    acc_dict['All'] = evaluate_all(model, test_x, test_y)
+    acc_dict.update(evaluate_per_task(model, X_list, Y_list))
+    acc_dict['All'] = evaluate_all(model, np.concatenate(X_list), np.concatenate(Y_list))
     acc_df.append(acc_dict)
     return acc_df
 
