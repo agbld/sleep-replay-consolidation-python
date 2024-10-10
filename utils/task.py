@@ -22,3 +22,27 @@ def create_class_task(X, Y, task_size, num_tasks=None):
         Ys = Ys[:num_tasks]
 
     return Xs, Ys
+
+import numpy as np
+
+def create_permutation_task(X, Y, num_tasks, perms: list = None):
+    Xs = []
+    Ys = []
+    
+    num_features = X.shape[1]  # Number of pixels in each image
+    
+    used_perms = []
+    for _ in range(num_tasks):
+        if perms is not None:
+            perm = perms[_]
+        else:
+            # Generate a random permutation of pixel indices
+            perm = np.random.permutation(num_features)
+        used_perms.append(perm)
+
+        # Apply the permutation to all images
+        X_permuted = X[:, perm]
+        Xs.append(X_permuted)
+        Ys.append(Y.copy())  # Labels remain the same for each task
+    
+    return Xs, Ys, used_perms
