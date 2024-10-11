@@ -160,6 +160,58 @@ class NeuronDeveloper():
             subtitle = post_subtitle + ' - ' + pre_subtitle
         self.activations[subtitle] = [post - pre for post, pre in zip(self.activations[post_subtitle], self.activations[pre_subtitle])]
         return self.activations[subtitle]
+    
+    def show_activation_difference(self, post_subtitle: str, pre_subtitle: str, task_id: int, output_path: str = None):
+        act_post = self.activations[post_subtitle]
+        act_pre = self.activations[pre_subtitle]
+        
+        # Calculate the cosine similarity between the activations before and after SRC
+        act_cosine = []
+        for i in range(len(act_post)):
+            act_cosine_layer = []
+            for j in range(10):
+                cosine_class = torch.nn.functional.cosine_similarity(act_post[i][j * 1000: (j + 1) * 1000], 
+                                                                     act_pre[i][j * 1000: (j + 1) * 1000], 
+                                                                     dim=1)
+                cosine_class = cosine_class.mean().item()
+                act_cosine_layer.append(cosine_class)
+            act_cosine.append(act_cosine_layer)
+        
+        # layer wise normalization for act_cosine
+        act_cosine = np.array(act_cosine)
+        act_cosine = (act_cosine - act_cosine.min(axis=1)[:, None]) / (act_cosine.max(axis=1) - act_cosine.min(axis=1))[:, None]
+
+        # class wise mean for act_cosine
+        act_cosine_mean = act_cosine.mean(axis=0)
+
+        # Create a figure with 2 subplots: one for the difference heatmap and one for the mean cosine similarity heatmap
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 5), 
+                                       gridspec_kw={'height_ratios': [3, 0.5]})  # Adjust the height ratio
+
+        # Plot the difference heatmap (1 - cosine similarity)
+        act_diff = 1 - np.array(act_cosine)
+        cax1 = ax1.imshow(act_diff, cmap='Reds', interpolation='nearest', aspect='auto')
+        fig.colorbar(cax1, ax=ax1)
+        ax1.set_title(f'Layer Activations Difference For Each Class at Task {task_id} (Normalized)', fontsize=18)
+        ax1.set(ylabel='Layer', xlabel='Class', 
+                yticks=[0, 1, 2], xticks=range(10), 
+                xticklabels=[str(i) for i in range(10)])
+
+        # Plot the mean difference heatmap (1 - cosine similarity)
+        act_diff_mean = 1 - np.array(act_cosine_mean)
+        cax2 = ax2.imshow(act_diff_mean.reshape(1, -1), cmap='Reds', interpolation='nearest', aspect='auto')
+        fig.colorbar(cax2, ax=ax2)
+        ax2.set_title(f'Mean Layer Activations Difference For Each Class at Task {task_id} (Normalized)', fontsize=18)
+        ax2.set(ylabel='Layer', xlabel='Class', 
+                yticks=[0], xticks=range(10), 
+                xticklabels=[str(i) for i in range(10)])
+        
+        # Adjust layout and show the plot
+        plt.tight_layout()
+        plt.show()
+
+        if output_path:
+            fig.savefig(output_path, bbox_inches='tight', facecolor='w')
 
     def reduce(self, pca_components=None):
         # Get the number of layers from the first entry in activations
@@ -212,7 +264,7 @@ class NeuronDeveloper():
 
         return self.reduced_activations
     
-    def show(self, mean_pooling=False):
+    def show(self, mean_pooling=False, save=True):
         num_layers = len(self.activations[list(self.activations.keys())[0]])
 
         fig, axs = plt.subplots(len(self.reduced_activations.keys()), 
@@ -245,6 +297,10 @@ class NeuronDeveloper():
                     fig.colorbar(im, ax=axs[j, i])
 
         self.fig = fig
+        plt.show()
+
+        if save:
+            self.save()
 
     def save(self):
         self.fig.savefig(self.output_path, bbox_inches='tight', facecolor='w')

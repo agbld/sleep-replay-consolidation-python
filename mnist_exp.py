@@ -125,8 +125,8 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
                                 'Before SRC')
 
         print('Before SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
-        # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-        # print("Stable Ranks:", sleep_opts['stable_ranks'])
+        sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        print("Stable Ranks:", sleep_opts['stable_ranks'])
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
         # Calculate the alpha
@@ -140,8 +140,8 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         src_model = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task)
         
         print('After SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
-        # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-        # print("Stable Ranks:", sleep_opts['stable_ranks'])
+        sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        print("Stable Ranks:", sleep_opts['stable_ranks'])
         acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
         # [Visual] Record activations after SRC and calculate the difference
@@ -170,10 +170,11 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         # [Visual] Show and save the plot
         neuron_developer.show(mean_pooling)
-        neuron_developer.save()
 
-    # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-    # print("Stable Ranks:", sleep_opts['stable_ranks'])
+        neuron_developer.show_activation_difference('After SRC', 'Before SRC', task_id, f'./png/activation_diff_task_{task_id}_before_after_src.png')
+
+    sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+    print("Stable Ranks:", sleep_opts['stable_ranks'])
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
     print(evaluate_all(src_model, test_X, test_Y))
@@ -245,7 +246,6 @@ neuron_developer.reduce(pca_components=10)
 
 # [Visual] Show and save the plot
 neuron_developer.show(mean_pooling)
-neuron_developer.save()
 
 #%%
 # Exp 3: Sequential Training
@@ -276,7 +276,6 @@ for task_id in range(num_tasks):
 
     # [Visual] Show and save the plot
     neuron_developer.show(mean_pooling)
-    neuron_developer.save()
 
 acc_df = log_accuracy('Sequential', 'After Training', acc_df, control_model, test_X_list, test_Y_list)
 
@@ -307,7 +306,6 @@ neuron_developer.reduce(pca_components=10)
 
 # [Visual] Show and save the plot
 neuron_developer.show(mean_pooling)
-neuron_developer.save()
 
 #%%
 acc_df = pd.DataFrame(acc_df)
