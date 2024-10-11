@@ -117,7 +117,7 @@ Each row of subplots contains three subplots, each representing a layer, with La
 
 In each subplot, the **x-axis** represents different ten **"neuron clusters"**. PCA is applied to reduce the dimensionality of each layer's activations from 4000 to 10. The **PCA projection matrices** are **aligned under the same layer in the same task**, but **differ across tasks** due to the nature of PCA. Note that the **last layer (Layer 2)** shows raw activation values **without PCA**, as it already consists of 10 dimensions. The **y-axis** represents the **input indices**, which are ordered by class index from top to bottom as class 0, class 1, ..., class 9. Each class contains 1000 samples.
 
-##### SRC - Before, After, and Difference
+##### Sleep Replay Consolidation (SRC)
 
 Each group of subplots shows the transitions of activations for each task. Here are brief explanations for each row:
 
@@ -149,6 +149,8 @@ According to the comparison between the **Before SRC** and **After SRC** models,
 <!-- Additionally, by observing the **synthetic model**, we can see that the output distributions are **very similar to those of the After SRC model** for the last task, but the **neurons related to the current task are noticeably less active**. For instance, when comparing the synthetic model from task 4 with the After SRC model from task 3, we can see that the two rightmost neurons, i.e., the 8th and 9th neurons, in the synthetic model are dimmer than those in the After SRC model. -->
 
 ##### Model Merging (Average)
+
+In this experiment, task-specific models are trained independently on different tasks from the same checkpoint (i.e., the same initial weights). After training, the models are merged by averaging their weights.
 
 ![](./png/layer_activations_merging.png)
 
