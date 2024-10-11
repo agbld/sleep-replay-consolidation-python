@@ -23,6 +23,8 @@ The original implementation, [tmtadros/SleepReplayConsolidation](https://github.
     pip install -r requirements.txt
     ```
 
+4. (optional) Run all experiments with [VSCode Python Interactive window](https://code.visualstudio.com/docs/python/jupyter-support-py). Since the entire project is developed and run with this extension, it is recommended to use it for a better experience. (eg. matplotlib)
+
 <details>
   <summary>Research Notes</summary>
 
