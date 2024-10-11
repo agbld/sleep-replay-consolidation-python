@@ -123,7 +123,7 @@ Each group of subplots shows the transitions of activations for each task. Here 
 
 1. **Before SRC**: The activations right **after training** on the current task and **before applying the SRC algorithm**.
 2. **After SRC**: The activations right **after training** and **after applying the SRC algorithm**.
-3. **Synthetic**: This is a custom synthetic model created to verify our hypothesis. According to the authors' claim, SRC will *"strengthen important synaptic connections and prune irrelevant ones"*. This effect is very similar to a popular research topic in machine learning known as ***network pruning***. By using this simple synthetic model, we can get a glimpse of what SRC actually does. The synthetic model is created by the following process:
+<!-- 3. **Synthetic**: This is a custom synthetic model created to verify our hypothesis. According to the authors' claim, SRC will *"strengthen important synaptic connections and prune irrelevant ones"*. This effect is very similar to a popular research topic in machine learning known as ***network pruning***. By using this simple synthetic model, we can get a glimpse of what SRC actually does. The synthetic model is created by the following process:
    1. Take a snapshot of the weight of model **before training** on the current task, denoted as $W_{\text{before}}$.
    2. Train the model on the current task. Then take another snapshot of the weight, denoted as $W_{\text{after}}$.
    3. Apply the SRC algorithm to the model and get the new weight, denoted as $W_{\text{SRC}}$.
@@ -135,8 +135,8 @@ Each group of subplots shows the transitions of activations for each task. Here 
 
       $$W_{\text{synthetic}} = W_{\text{before}} + \Delta W_{\text{SRC}}$$
 
-      We then use the $W_{\text{synthetic}}$ initialized the synthetic model.
-4. **Difference**: The difference between the activations **before and after SRC algorithm**. This is also used for observing the effect of SRC on the model.
+      We then use the $W_{\text{synthetic}}$ initialized the synthetic model. -->
+3. **Difference**: The difference between the activations **before and after SRC algorithm**. This is also used for observing the effect of SRC on the model.
 
 ![](./png/layer_activations_task_0_before_after_src.png)
 ![](./png/layer_activations_task_1_before_after_src.png)
@@ -146,7 +146,7 @@ Each group of subplots shows the transitions of activations for each task. Here 
 
 According to the comparison between the **Before SRC** and **After SRC** models, especially the distributions in layer 2 (i.e., the output layer), we can see that the model does not actually forget the previous tasks. Instead, it seems to give too much "attention" to the current task and "forgets" the previous tasks. This is a clear sign of catastrophic forgetting. Through SRC, it inhibits the less important weights used for the current task, which might also act as "noise" (a very loud one) to the previous tasks, resulting in the "recovery" of the previous tasks.
 
-Additionally, by observing the **synthetic model**, we can see that the output distributions are **very similar to those of the After SRC model** for the last task, but the **neurons related to the current task are noticeably less active**. For instance, when comparing the synthetic model from task 4 with the After SRC model from task 3, we can see that the two rightmost neurons, i.e., the 8th and 9th neurons, in the synthetic model are dimmer than those in the After SRC model.
+<!-- Additionally, by observing the **synthetic model**, we can see that the output distributions are **very similar to those of the After SRC model** for the last task, but the **neurons related to the current task are noticeably less active**. For instance, when comparing the synthetic model from task 4 with the After SRC model from task 3, we can see that the two rightmost neurons, i.e., the 8th and 9th neurons, in the synthetic model are dimmer than those in the After SRC model. -->
 
 ##### Model Merging (Average)
 
