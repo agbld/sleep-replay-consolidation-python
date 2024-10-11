@@ -65,8 +65,8 @@ test_X_list, test_Y_list, _ = create_permutation_task(test_X, test_Y, num_tasks,
 
 # Keep only the first 5000 samples for each task
 for i in range(num_tasks):
-    train_X_list[i] = train_X_list[i][:5000]
-    train_Y_list[i] = train_Y_list[i][:5000]
+    train_X_list[i] = train_X_list[i][:50000]
+    train_Y_list[i] = train_Y_list[i][:50000]
 
 # Concatenate all tasks for parallel training
 train_X = np.concatenate(train_X_list)
@@ -80,7 +80,7 @@ test_Y = np.concatenate(test_Y_list)
 acc_df = []
 
 opts = {
-    'numepochs': 5,         # Number of epochs
+    'numepochs': 2,         # Number of epochs
     'batchsize': 100,       # Batch size for training
     'learning_rate': 0.01,   # Learning rate for SGD
     'momentum': 0.5         # Momentum for SGD
