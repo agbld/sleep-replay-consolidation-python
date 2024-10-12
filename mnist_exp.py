@@ -111,7 +111,8 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         # [Visual] Initialize the NeuronDeveloper for layer visualization
         neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Before, After SRC, and Difference',
-                                           output_path=f'./png/layer_activations_task_{task_id}_before_after_src.png')
+                                           output_path=f'./png/layer_activations_task_{task_id}_before_after_src.png',
+                                           disable=True) # Disable the visualization for quick testing
 
         train_X_task = train_X_list[task_id]
         train_Y_task = train_Y_list[task_id]
@@ -125,24 +126,33 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
                                 'Before SRC')
 
         print('Before SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
-        sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-        print("Stable Ranks:", sleep_opts['stable_ranks'])
-        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' Before SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
+        # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        # print("Stable Ranks:", sleep_opts['stable_ranks'])
 
-        # Calculate the alpha
-        # _, factor_log = normalize_nn_data(src_model, task_train_x)
+        # # Calculate the alpha
+        # _, factor_log = normalize_nn_data(src_model, train_X_task)
         # sleep_opts['alpha'] = [alpha * sleep_opts['alpha_scale'] for alpha in factor_log]
         # print('alpha: ', sleep_opts['alpha'])
 
         # Run the sleep phase (with gradual increase in the number of iterations)
         sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
         # model_before_src = copy.deepcopy(src_model) # Take a snapshot of the model before SRC (for synthetic model creation)
-        src_model = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task)
         
+        def callback_func(nn, step, norm, acc_df):
+            sleep_opts['steps'] = step
+            sleep_opts['norm'] = norm
+            acc_df = log_accuracy('SRC', 'Task ' + str(task_id) + f' (step: {step})', acc_df, nn, test_X_list, test_Y_list, sleep_opts)
+            sleep_opts.pop('steps')
+            sleep_opts.pop('norm')
+            return acc_df
+        
+        src_model, acc_df = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task, 
+                                        callback_func=callback_func, callback_steps=50, acc_df=acc_df,
+                                        save_best=True)
+                        
         print('After SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
-        sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-        print("Stable Ranks:", sleep_opts['stable_ranks'])
-        acc_df = log_accuracy(f'SRC', 'Task ' + str(task_id) + ' After SRC', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
+        # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+        # print("Stable Ranks:", sleep_opts['stable_ranks'])
 
         # [Visual] Record activations after SRC and calculate the difference
         neuron_developer.record(src_model, train_X_sequential, 'After SRC')
@@ -173,11 +183,11 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         neuron_developer.show_activation_difference('After SRC', 'Before SRC', task_id, f'./png/activation_diff_task_{task_id}_before_after_src.png')
 
-    sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
-    print("Stable Ranks:", sleep_opts['stable_ranks'])
+    # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
+    # print("Stable Ranks:", sleep_opts['stable_ranks'])
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
-    print(evaluate_all(src_model, test_X, test_Y))
+    print('All Tasks: ', evaluate_all(src_model, test_X, test_Y))
 
     return acc_df
 
@@ -195,6 +205,9 @@ for iteration in [400]:
                 'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
                 'samples_per_iter': 10, # original: (entire X from current task)
             },)
+        
+acc_df_src = pd.DataFrame(acc_df)
+acc_df_src.to_csv(f'results_src.csv')
 
 #%%
 # Exp 2: Model Merging

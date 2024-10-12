@@ -133,10 +133,12 @@ class NeuronDeveloper():
                  title: str, 
                  output_path: str, 
                  get_activations=get_activations,
-                 device=None):
+                 device=None,
+                 disable=False):
         self.title = title
         self.output_path = output_path
         self.get_activations = get_activations
+        self.disable = disable
         if device:
             self.device = device
         else:
@@ -147,6 +149,8 @@ class NeuronDeveloper():
         self.fig = None
         
     def record(self, model: SimpleNN, x, subtitle: str) -> list:
+        if self.disable:
+            return []
         with torch.no_grad():
             model.eval()
             activation = self.get_activations(model.to(self.device), torch.Tensor(x).to(self.device))
@@ -156,12 +160,16 @@ class NeuronDeveloper():
         return activation
     
     def record_diff(self, post_subtitle: str, pre_subtitle: str, subtitle: str = None) -> list:
+        if self.disable:
+            return []
         if not subtitle:
             subtitle = post_subtitle + ' - ' + pre_subtitle
         self.activations[subtitle] = [post - pre for post, pre in zip(self.activations[post_subtitle], self.activations[pre_subtitle])]
         return self.activations[subtitle]
     
     def show_activation_difference(self, post_subtitle: str, pre_subtitle: str, task_id: int, output_path: str = None):
+        if self.disable:
+            return
         act_post = self.activations[post_subtitle]
         act_pre = self.activations[pre_subtitle]
         
@@ -214,6 +222,8 @@ class NeuronDeveloper():
             fig.savefig(output_path, bbox_inches='tight', facecolor='w')
 
     def reduce(self, pca_components=None):
+        if self.disable:
+            return {}
         # Get the number of layers from the first entry in activations
         num_layers = len(next(iter(self.activations.values())))
 
@@ -265,6 +275,8 @@ class NeuronDeveloper():
         return self.reduced_activations
     
     def show(self, mean_pooling=False, save=True):
+        if self.disable:
+            return
         num_layers = len(self.activations[list(self.activations.keys())[0]])
 
         fig, axs = plt.subplots(len(self.reduced_activations.keys()), 
@@ -303,6 +315,8 @@ class NeuronDeveloper():
             self.save()
 
     def save(self):
+        if self.disable:
+            return
         self.fig.savefig(self.output_path, bbox_inches='tight', facecolor='w')
 
 # Function to compute stable rank

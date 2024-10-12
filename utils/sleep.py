@@ -1,3 +1,4 @@
+from typing import Tuple
 from utils.nn import SimpleNN
 import torch
 import numpy as np
@@ -7,8 +8,13 @@ from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Tensor, device: torch.device = device) -> SimpleNN:
+def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Tensor, device: torch.device = device,
+                callback_func = None, callback_steps = 0, acc_df = None,
+                save_best = False) -> Tuple[SimpleNN, dict]:
     nn = copy.deepcopy(nn)  # Create a deep copy of the network to avoid modifying the original network
+
+    nn_best = None
+    acc_all_best = 0
 
     nn.eval()  # Set the network to evaluation mode (disabling dropout)
 
@@ -32,6 +38,9 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
 
     with torch.no_grad():
         with tqdm(total=num_iterations) as pbar:
+            
+            accumulated_weight_deltas = [torch.zeros_like(layer.weight) for layer in nn.layers]
+
             for t in range(num_iterations):
                 # Create Poisson-distributed spikes from the input images
                 # The input is randomly spiked at each time step
@@ -77,6 +86,9 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     # Compute the weight delta
                     weight_delta = stdp(nn.layers[l - 1].weight, pre, post)
 
+                    # Accumulate the weight deltas
+                    accumulated_weight_deltas[l - 1] += weight_delta
+
                     # Update weights
                     nn.layers[l - 1].weight += weight_delta
 
@@ -85,6 +97,16 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
 
                     # Update the refractory period for spiking neurons
                     refrac_end[l][spikes[l] == 1] = t + sleep_opts['t_ref']
+
+                if callback_func is not None and t % callback_steps == 0:
+                    # calculate the l2 norm of the weight deltas
+                    weight_deltas_norms = [torch.norm(weight_delta) for weight_delta in accumulated_weight_deltas]
+                    acc_df = callback_func(nn, t, weight_deltas_norms, acc_df)
+                    if save_best:
+                        acc_dict = acc_df[-1]
+                        if acc_dict['All'] > acc_all_best:
+                            acc_all_best = acc_dict['All']
+                            nn_best = copy.deepcopy(nn)
 
                 pbar.update(1)
 
@@ -97,7 +119,9 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     nn.layers[l - 1].weight = sleep_opts['gamma'] * nn.layers[l - 1].weight / (torch.max(nn.layers[l - 1].weight) - torch.min(nn.layers[l - 1].weight)) * \
                         (torch.max(sleep_opts['W_old'][l - 1]) - torch.min(sleep_opts['W_old'][l - 1]))
                 
-    return nn
+    if save_best:
+        return nn_best, acc_df
+    return nn, acc_df
 
 def create_masked_input(X, numexamples, mask_size):
     warnings.warn("create_masked_input is deprecated and will be removed in a future version.", DeprecationWarning)
