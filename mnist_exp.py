@@ -1,5 +1,6 @@
 #%%
 # Import necessary libraries
+import sys
 import torch
 import numpy as np
 from torchvision import datasets, transforms
@@ -205,7 +206,7 @@ for iteration in [400]:
                 'bonus_iterations': int(iteration / 3),
                 'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
                 'samples_per_iter': 10, # original: (entire X from current task)
-                'callback_steps': 50,
+                'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
             },)
         
 acc_df_src = pd.DataFrame(acc_df)
