@@ -97,6 +97,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         'bonus_iterations': 0,
         'mask_fraction': 0.25,
         'samples_per_iter': 10,
+        'callback_steps': 50,
     }
 
     sleep_opts.update(sleep_opts_update)
@@ -147,7 +148,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
             return acc_df
         
         src_model, acc_df = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task, 
-                                        callback_func=callback_func, callback_steps=50, acc_df=acc_df,
+                                        callback_func=callback_func, callback_steps=sleep_opts['callback_steps'], acc_df=acc_df,
                                         save_best=True)
                         
         print('After SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
@@ -204,6 +205,7 @@ for iteration in [400]:
                 'bonus_iterations': int(iteration / 3),
                 'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
                 'samples_per_iter': 10, # original: (entire X from current task)
+                'callback_steps': 50,
             },)
         
 acc_df_src = pd.DataFrame(acc_df)

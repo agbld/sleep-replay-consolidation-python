@@ -98,7 +98,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     # Update the refractory period for spiking neurons
                     refrac_end[l][spikes[l] == 1] = t + sleep_opts['t_ref']
 
-                if callback_func is not None and t % callback_steps == 0:
+                if (callback_func is not None) and (t % callback_steps == 0 or t == num_iterations - 1):
                     # calculate the l2 norm of the weight deltas
                     weight_deltas_norms = [torch.norm(weight_delta) for weight_delta in accumulated_weight_deltas]
                     acc_df = callback_func(nn, t, weight_deltas_norms, acc_df)
