@@ -39,7 +39,13 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
     with torch.no_grad():
         with tqdm(total=num_iterations) as pbar:
             
-            accumulated_weight_deltas = [torch.zeros_like(layer.weight) for layer in nn.layers]
+            # Initialize log variables
+            accum_dW_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
+            accum_dW_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
+            accum_H_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
+            accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
+            last_accum_H_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
+            last_accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
 
             for t in range(num_iterations):
                 # Create Poisson-distributed spikes from the input images
@@ -67,30 +73,25 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     threshold = sleep_opts['threshold'] * sleep_opts['beta'][l - 1]
                     spikes[l] = torch.Tensor((membrane_potentials[l] >= threshold).float())
 
-                    # Spike-Timing Dependent Plasticity (STDP) to adjust weights
-                    def stdp(weight, pre, post):
-                        # Compute the weight delta using broadcasting
-                        sigmoid_weights = torch.sigmoid(weight)
-
-                        # Compute the weight delta using broadcasting
-                        weight_inc = sleep_opts['inc'] * (post == 1) * (pre == 1) * sigmoid_weights
-                        weight_dec = sleep_opts['dec'] * (post == 1) * (pre == 0) * sigmoid_weights
-
-                        # Combine increments and decrements
-                        return weight_inc - weight_dec
-
                     # Get pre-synaptic spikes and post-synaptic spikes
                     pre = spikes[l - 1].unsqueeze(0)  # (num_pre_neurons,) -> (1, num_pre_neurons)
                     post = spikes[l].unsqueeze(1)  # (num_post_neurons,) -> (num_post_neurons, 1)
-                    
-                    # Compute the weight delta
-                    weight_delta = stdp(nn.layers[l - 1].weight, pre, post)
+        
+                    # Spike-Timing Dependent Plasticity (STDP) to adjust weights
+                    sigmoid_weights = torch.sigmoid(nn.layers[l - 1].weight)
 
-                    # Accumulate the weight deltas
-                    accumulated_weight_deltas[l - 1] += weight_delta
+                    dW_inc = sleep_opts['inc'] * (post == 1) * (pre == 1) * sigmoid_weights
+                    dW_dec = sleep_opts['dec'] * (post == 1) * (pre == 0) * sigmoid_weights
+                    dW = dW_inc - dW_dec
+
+                    # Update log variables
+                    accum_dW_inc[l - 1] += dW_inc
+                    accum_dW_dec[l - 1] += dW_dec
+                    accum_H_inc[l - 1] += (post == 1) * (pre == 1)
+                    accum_H_dec[l - 1] += (post == 1) * (pre == 0)
 
                     # Update weights
-                    nn.layers[l - 1].weight += weight_delta
+                    nn.layers[l - 1].weight += dW
 
                     # Reset the membrane potential of spiking neurons
                     membrane_potentials[l][spikes[l] == 1] = 0
@@ -99,9 +100,39 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     refrac_end[l][spikes[l] == 1] = t + sleep_opts['t_ref']
 
                 if (callback_func is not None) and (t % callback_steps == 0 or t == num_iterations - 1):
-                    # calculate the l2 norm of the weight deltas
-                    weight_deltas_norms = [torch.norm(weight_delta) for weight_delta in accumulated_weight_deltas]
-                    acc_df = callback_func(nn, t, weight_deltas_norms, acc_df)
+                    # calculate the l2 norm of the dW_inc, dW_dec
+                    dW_inc_norm = [torch.norm(torch.flatten(dW), p=2).item() for dW in accum_dW_inc]
+                    dW_dec_norm = [torch.norm(torch.flatten(dW), p=2).item() for dW in accum_dW_dec]
+
+                    # calculate the l2 norm of the H_inc, H_dec
+                    H_inc_norm = [torch.norm(torch.flatten(H_inc), p=2).item() for H_inc in accum_H_inc]
+                    H_dec_norm = [torch.norm(torch.flatten(H_dec), p=2).item() for H_dec in accum_H_dec]
+
+                    # calculate the l2 norm of the dH_inc, dH_dec
+                    dH_inc = [accum_H_inc[i] - last_accum_H_inc[i] for i in range(len(accum_H_inc))]
+                    dH_dec = [accum_H_dec[i] - last_accum_H_dec[i] for i in range(len(accum_H_dec))]
+                    dH_inc_norm = [torch.norm(torch.flatten(dH), p=2).item() for dH in dH_inc]
+                    dH_dec_norm = [torch.norm(torch.flatten(dH), p=2).item() for dH in dH_dec]
+
+                    # Reset the log variables
+                    accum_dW_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
+                    accum_dW_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
+                    last_accum_H_inc = copy.deepcopy(accum_H_inc)
+                    last_accum_H_dec = copy.deepcopy(accum_H_dec)
+                    accum_H_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
+                    accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
+
+                    args = {
+                        'steps': t,
+                        'dW_inc_norm': dW_inc_norm,
+                        'dW_dec_norm': dW_dec_norm,
+                        'dH_inc_norm': dH_inc_norm,
+                        'dH_dec_norm': dH_dec_norm,
+                        'H_inc_norm': H_inc_norm,
+                        'H_dec_norm': H_dec_norm
+                    }
+
+                    acc_df = callback_func(nn, acc_df, args)
                     if save_best:
                         acc_dict = acc_df[-1]
                         if acc_dict['All'] > acc_all_best:

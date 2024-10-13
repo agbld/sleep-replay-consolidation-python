@@ -141,12 +141,10 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         sleep_period = int(sleep_opts['iterations'] + task_id * sleep_opts['bonus_iterations'])
         # model_before_src = copy.deepcopy(src_model) # Take a snapshot of the model before SRC (for synthetic model creation)
         
-        def callback_func(nn, step, norm, acc_df):
-            sleep_opts['steps'] = step
-            sleep_opts['norm'] = norm
-            acc_df = log_accuracy('SRC', 'Task ' + str(task_id) + f' (step: {step})', acc_df, nn, test_X_list, test_Y_list, sleep_opts)
-            sleep_opts.pop('steps')
-            sleep_opts.pop('norm')
+        def callback_func(nn, acc_df, args):
+            _sleep_opts = sleep_opts.copy()
+            _sleep_opts.update(args)
+            acc_df = log_accuracy('SRC', 'Task ' + str(task_id), acc_df, nn, test_X_list, test_Y_list, _sleep_opts)
             return acc_df
         
         src_model, acc_df = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task, 
@@ -203,13 +201,14 @@ for iteration in [400]:
                 'inc': 0.001,
                 'dec': 0.0001,
 
-                    # --- Additional params from original SRC ---
-                    'bonus_iterations': int(iteration / 3),
-                    'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
-                    'samples_per_iter': 10, # original: (entire X from current task)
-                    'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
-                    'save_best': False,
-                },)
+                # --- Additional params from original SRC ---
+                'bonus_iterations': int(iteration / 3),
+                'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
+                'samples_per_iter': 10, # original: (entire X from current task)
+                'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
+                'save_best': False,
+            },
+        )
         
 acc_df_src = pd.DataFrame(acc_df)
 acc_df_src.to_csv(f'results_src.csv')
