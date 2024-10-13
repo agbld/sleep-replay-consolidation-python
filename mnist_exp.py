@@ -99,6 +99,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         'mask_fraction': 0.25,
         'samples_per_iter': 10,
         'callback_steps': 50,
+        'save_best': False,
     }
 
     sleep_opts.update(sleep_opts_update)
@@ -150,7 +151,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         
         src_model, acc_df = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task, 
                                         callback_func=callback_func, callback_steps=sleep_opts['callback_steps'], acc_df=acc_df,
-                                        save_best=True)
+                                        save_best=sleep_opts['save_best'])
                         
         print('After SRC: ', evaluate_per_task(src_model, test_X_list, test_Y_list))
         # sleep_opts['stable_ranks'] = compute_stable_rank(src_model)
@@ -202,12 +203,13 @@ for iteration in [400]:
                 'inc': 0.001,
                 'dec': 0.0001,
 
-                # --- Additional params from original SRC ---
-                'bonus_iterations': int(iteration / 3),
-                'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
-                'samples_per_iter': 10, # original: (entire X from current task)
-                'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
-            },)
+                    # --- Additional params from original SRC ---
+                    'bonus_iterations': int(iteration / 3),
+                    'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
+                    'samples_per_iter': 10, # original: (entire X from current task)
+                    'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
+                    'save_best': False,
+                },)
         
 acc_df_src = pd.DataFrame(acc_df)
 acc_df_src.to_csv(f'results_src.csv')
