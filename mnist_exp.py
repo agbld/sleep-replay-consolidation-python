@@ -2,18 +2,15 @@
 # Import necessary libraries
 import sys
 import torch
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 import numpy as np
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
 import pandas as pd
-import copy
-
-from utils.nn import SimpleNN, NeuronDeveloper
-from utils.nn import train_network, evaluate_all, evaluate_per_task, log_accuracy, compute_stable_rank
+from torchvision import datasets, transforms
+from utils.nn import train_network, evaluate_per_task, log_accuracy, compute_stable_rank
 from utils.sleep import sleep_phase
 from utils.task import create_class_task
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+from utils.nn import SimpleNN, NeuronDeveloper
+disable_neuron_developer = True
 
 #%%
 # MNIST Dataset Loading
@@ -115,7 +112,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
         # [Visual] Initialize the NeuronDeveloper for layer visualization
         neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Before, After SRC, and Difference',
                                            output_path=f'./png/layer_activations_task_{task_id}_before_after_src.png',
-                                           disable=True) # Disable the visualization for quick testing
+                                           disable=disable_neuron_developer)
 
         train_X_task = train_X_list[task_id]
         train_Y_task = train_Y_list[task_id]
@@ -188,8 +185,6 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
     # print("Stable Ranks:", sleep_opts['stable_ranks'])
     acc_df = log_accuracy(f'SRC', 'After Training', acc_df, src_model, test_X_list, test_Y_list, sleep_opts)
 
-    print('All Tasks: ', evaluate_all(src_model, test_X, test_Y))
-
     return acc_df
 
 for iteration in [400]:
@@ -220,7 +215,8 @@ task_models = []
 
 # [Visual] Initialize the NeuronDeveloper for layer visualization
 neuron_developer = NeuronDeveloper(title=f'Layer Activations: Merging',
-                                    output_path=f'./png/layer_activations_merging.png')
+                                   output_path=f'./png/layer_activations_merging.png',
+                                   disable=disable_neuron_developer)
 
 for task_id in range(num_tasks):
 
@@ -253,7 +249,6 @@ for task_model in task_models:
 
 acc_df = log_accuracy('Merging', 'Merged', acc_df, merged_model, test_X_list, test_Y_list)
 print(evaluate_per_task(merged_model, test_X_list, test_Y_list))
-print(evaluate_all(merged_model, test_X, test_Y))
 
 # [Visual] Record activations layer visualization
 neuron_developer.record(merged_model, train_X_sequential, 'Merged')
@@ -274,7 +269,8 @@ for task_id in range(num_tasks):
 
     # [Visual] Initialize the NeuronDeveloper for layer visualization
     neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Sequential',
-                                       output_path=f'./png/layer_activations_task_{task_id}_sequential.png')
+                                       output_path=f'./png/layer_activations_task_{task_id}_sequential.png',
+                                       disable=disable_neuron_developer)
     
     train_X_task = train_X_list[task_id]
     train_Y_task = train_Y_list[task_id]
@@ -295,8 +291,47 @@ for task_id in range(num_tasks):
     neuron_developer.show(mean_pooling)
 
 acc_df = log_accuracy('Sequential', 'After Training', acc_df, control_model, test_X_list, test_Y_list)
+#%%
+# Exp x: Sequential Training (Cheat 1)
 
-print(evaluate_all(control_model, test_X, test_Y))
+if False:
+    control_model = SimpleNN(nn_size_template).to(device)
+
+    # acc_df = log_accuracy('Sequential', 'Initial', acc_df, control_model, test_X_list, test_Y_list)
+
+    for task_id in range(num_tasks):
+
+        # [Visual] Initialize the NeuronDeveloper for layer visualization
+        neuron_developer = NeuronDeveloper(title=f'Layer Activations for Task {task_id}: Sequential',
+                                        output_path=f'./png/layer_activations_task_{task_id}_sequential.png',
+                                        disable=disable_neuron_developer)
+        
+        train_X_task = train_X_list[task_id]
+        train_Y_task = train_Y_list[task_id]
+        
+        control_model = train_network(control_model, train_X_task, train_Y_task, opts)
+
+        # Do "cheat" modification to the model. Set the weights to current_task_cls of last layer to 0
+        current_task_cls = np.unique(train_Y_task)
+        with torch.no_grad():
+            control_model.layers[-1].weight[:, current_task_cls] = 0
+
+        print(evaluate_per_task(control_model, test_X_list, test_Y_list, 
+                                current_task=task_id)) # "Cheat"
+
+        # acc_df = log_accuracy('Sequential', 'Task ' + str(task_id), acc_df, control_model, test_X_list, test_Y_list)
+
+        # [Visual] Record activations layer visualization
+        neuron_developer.record(control_model, train_X_sequential, 'Sequential')
+
+        # [Visual] Reduce the dimensionality of the activations using PCA
+        neuron_developer.reduce(pca_components=10)
+
+        # [Visual] Show and save the plot
+        neuron_developer.show(mean_pooling)
+
+    # acc_df = log_accuracy('Sequential (Cheat)', 'After Training', acc_df, control_model, test_X_list, test_Y_list)
+
 
 #%%
 # Exp 4: Parallel Training
@@ -304,7 +339,8 @@ parallel_model = SimpleNN(nn_size_template).to(device)
 
 # [Visual] Initialize the NeuronDeveloper for layer visualization
 neuron_developer = NeuronDeveloper(title=f'Layer Activations: Parallel',
-                                   output_path=f'./png/layer_activations_parallel.png')
+                                   output_path=f'./png/layer_activations_parallel.png',
+                                   disable=disable_neuron_developer)
 
 acc_df = log_accuracy('Parallel', 'Initial', acc_df, parallel_model, test_X_list, test_Y_list)
 
@@ -313,7 +349,6 @@ train_network(parallel_model, train_X, train_Y, opts)
 acc_df = log_accuracy('Parallel', 'After Training', acc_df, parallel_model, test_X_list, test_Y_list)
 
 print(evaluate_per_task(parallel_model, test_X_list, test_Y_list))
-print(evaluate_all(parallel_model, test_X, test_Y))
 
 # [Visual] Record activations layer visualization
 neuron_developer.record(parallel_model, train_X_sequential, 'Parallel')

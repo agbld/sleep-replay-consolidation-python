@@ -66,12 +66,15 @@ def evaluate_all(model, X, Y):
     # print(f'Accuracy All: {accuracy:.2f}%')
     return accuracy
 
-def evaluate_per_task(model, X_list, Y_list):
+def evaluate_per_task(model, X_list, Y_list, current_task=None):
     model.eval()  # Set the model to evaluation mode
     accuracies = {}
     num_tasks = len(X_list)
     if num_tasks != len(Y_list):
         raise ValueError('Number of task inputs and outputs must match')
+    
+    if current_task is not None:
+        current_task_cls = list(set(Y_list[current_task]))
     
     # Evaluate accuracy for each task
     with torch.no_grad():
@@ -89,13 +92,26 @@ def evaluate_per_task(model, X_list, Y_list):
             for data, target in loader:
                 data, target = data.to(torch.device(device)), target.to(torch.device(device))
                 output = model(data)
+                
+                # Do "cheat" if current_task is not None
+                if current_task is not None:
+                    if current_task != task_id:
+                        # Set the `output` to 0 for each neuron with index not in the current_task_classes
+                        for i in range(len(output)):
+                            output[i][[j for j in range(10) if j in current_task_cls]] = 0
+
                 _, predicted = torch.max(output.data, 1)
                 total += target.size(0)
                 correct += (predicted == target).sum().item()
             
             accuracy = 100 * correct / total if total > 0 else 0
             accuracies[f'Task {task_id}'] = f'{accuracy:5.2f}'
-            # print(f'Accuracy for Task {task_id}: {accuracy:.2f}%')
+
+    # Calculate the average accuracy across all tasks (weighted by the number of examples)
+    total_examples = sum([len(Y) for Y in Y_list])
+    weighted_accuracies = [len(Y_list[i]) * float(acc) for i, acc in enumerate(accuracies.values())]
+    avg_accuracy = sum(weighted_accuracies) / total_examples
+    accuracies['All Task'] = f'{avg_accuracy:5.2f}'
     
     return accuracies
 
@@ -105,7 +121,6 @@ def log_accuracy(approach: str, stage: str, acc_df: list, model: SimpleNN, X_lis
     acc_dict['Stage'] = stage
     acc_dict.update(args)
     acc_dict.update(evaluate_per_task(model, X_list, Y_list))
-    acc_dict['All'] = evaluate_all(model, np.concatenate(X_list), np.concatenate(Y_list))
     acc_df.append(acc_dict)
     return acc_df
 
