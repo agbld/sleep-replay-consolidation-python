@@ -37,7 +37,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
     refrac_end = [torch.zeros(size).to(device) for size in nn_size]
 
     with torch.no_grad():
-        with tqdm(total=num_iterations) as pbar:
+        with tqdm(total=num_iterations, desc="Sleep Phase") as pbar:
             
             # Initialize log variables
             accum_dW_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]

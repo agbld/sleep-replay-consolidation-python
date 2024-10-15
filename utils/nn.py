@@ -111,16 +111,16 @@ def evaluate_per_task(model, X_list, Y_list, current_task=None):
     total_examples = sum([len(Y) for Y in Y_list])
     weighted_accuracies = [len(Y_list[i]) * float(acc) for i, acc in enumerate(accuracies.values())]
     avg_accuracy = sum(weighted_accuracies) / total_examples
-    accuracies['All Task'] = f'{avg_accuracy:5.2f}'
+    accuracies['Task All'] = f'{avg_accuracy:5.2f}'
     
     return accuracies
 
-def log_accuracy(approach: str, stage: str, acc_df: list, model: SimpleNN, X_list, Y_list, args: dict = {}):
+def log_accuracy(approach: str, stage: str, acc_df: list, evaluate_results, args: dict = {}):
     acc_dict = {}
     acc_dict['Approach'] = approach
     acc_dict['Stage'] = stage
     acc_dict.update(args)
-    acc_dict.update(evaluate_per_task(model, X_list, Y_list))
+    acc_dict.update(evaluate_results)
     acc_df.append(acc_dict)
     return acc_df
 

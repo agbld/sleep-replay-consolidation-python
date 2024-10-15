@@ -8,7 +8,7 @@ from matplotlib.cm import Greens
 from matplotlib import font_manager as fm
 
 # Load the CSV file into a DataFrame, selecting specific columns
-df = pd.read_csv('./results.csv', usecols=['Approach', 'Stage', 'Task 0', 'Task 1', 'Task 2', 'Task 3', 'Task 4', 'All'])
+df = pd.read_csv('./results.csv', usecols=['Approach', 'Stage', 'steps', 'Task 0', 'Task 1', 'Task 2', 'Task 3', 'Task 4', 'Task All'])
 df = df[~df['Stage'].str.contains('Initial')]
 df = df[~df['Stage'].str.contains('Synthetic')]
 df = df.reset_index(drop=True)
@@ -40,10 +40,10 @@ for key, cell in table.get_celld().items():
         cell.set_width(0.3)
 
 # Color formatting for task columns based on value
-task_cols = [df.columns.get_loc(col) for col in df.columns if 'Task' in col or col == 'All']
+task_cols = [df.columns.get_loc(col) for col in df.columns if 'Task' in col or col == 'All Task']
 for (i, j), val in np.ndenumerate(df.values):
     if j in task_cols and np.isreal(val):
-        color = color_map(norm(val) - 0.4)
+        color = color_map(norm(val) - 0.2)
         table[(i+1, j)].set_facecolor(color)
         table[(i+1, j)].set_text_props(color='black') # if val > 50 else 'white')
 
