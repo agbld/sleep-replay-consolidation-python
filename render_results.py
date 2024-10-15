@@ -9,6 +9,7 @@ from matplotlib import font_manager as fm
 
 # Load the CSV file into a DataFrame, selecting specific columns
 df = pd.read_csv('./results.csv', usecols=['Approach', 'Stage', 'steps', 'Task 0', 'Task 1', 'Task 2', 'Task 3', 'Task 4', 'Task All'])
+df = df[['Approach', 'Stage', 'steps', 'Task 0', 'Task 1', 'Task 2', 'Task 3', 'Task 4', 'Task All']]
 df = df[~df['Stage'].str.contains('Initial')]
 df = df[~df['Stage'].str.contains('Synthetic')]
 df = df.reset_index(drop=True)

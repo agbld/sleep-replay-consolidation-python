@@ -39,7 +39,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
     with torch.no_grad():
         with tqdm(total=num_iterations, desc="Sleep Phase") as pbar:
             
-            # Initialize log variables
+            # [Callback] Initialize callback variables
             accum_dW_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
             accum_dW_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
             accum_H_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
@@ -84,7 +84,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     dW_dec = sleep_opts['dec'] * (post == 1) * (pre == 0) * sigmoid_weights
                     dW = dW_inc - dW_dec
 
-                    # Update log variables
+                    # [Callback] Update callback variables
                     accum_dW_inc[l - 1] += dW_inc
                     accum_dW_dec[l - 1] += dW_dec
                     accum_H_inc[l - 1] += (post == 1) * (pre == 1)
@@ -99,6 +99,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     # Update the refractory period for spiking neurons
                     refrac_end[l][spikes[l] == 1] = t + sleep_opts['t_ref']
 
+                # [Callback] Execute callback function if provided
                 if (callback_func is not None) and (t % callback_steps == 0 or t == num_iterations - 1):
                     # calculate the l2 norm of the dW_inc, dW_dec
                     dW_inc_norm = [torch.norm(torch.flatten(dW), p=2).item() for dW in accum_dW_inc]
@@ -123,7 +124,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
 
                     args = {
-                        'steps': t,
+                        'steps': int(t),
                         'dW_inc_norm': dW_inc_norm,
                         'dW_dec_norm': dW_dec_norm,
                         'dH_inc_norm': dH_inc_norm,
