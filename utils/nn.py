@@ -202,14 +202,14 @@ class NeuronDeveloper():
         
         # layer wise normalization for act_cosine
         act_cosine = np.array(act_cosine)
-        act_cosine = (act_cosine - act_cosine.min(axis=1)[:, None]) / (act_cosine.max(axis=1) - act_cosine.min(axis=1))[:, None]
+        # act_cosine = (act_cosine - act_cosine.min(axis=1)[:, None]) / (act_cosine.max(axis=1) - act_cosine.min(axis=1))[:, None]
 
         # class wise mean for act_cosine
         act_cosine_mean = act_cosine.mean(axis=0)
 
         # Create a figure with 2 subplots: one for the difference heatmap and one for the mean cosine similarity heatmap
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 5), 
-                                       gridspec_kw={'height_ratios': [3, 0.5]})  # Adjust the height ratio
+                           gridspec_kw={'height_ratios': [3, 0.5]})  # Adjust the height ratio
 
         # Plot the difference heatmap (1 - cosine similarity)
         act_diff = 1 - np.array(act_cosine)
@@ -217,8 +217,13 @@ class NeuronDeveloper():
         fig.colorbar(cax1, ax=ax1)
         ax1.set_title(f'Layer Activations Difference For Each Class at Task {task_id} (Normalized)', fontsize=18)
         ax1.set(ylabel='Layer', xlabel='Class', 
-                yticks=[0, 1, 2], xticks=range(10), 
-                xticklabels=[str(i) for i in range(10)])
+            yticks=[0, 1, 2], xticks=range(10), 
+            xticklabels=[str(i) for i in range(10)])
+
+        # Annotate the heatmap with the values
+        for i in range(act_diff.shape[0]):
+            for j in range(act_diff.shape[1]):
+                ax1.text(j, i, f'{act_diff[i, j]:.2f}', ha='center', va='center', color='black')
 
         # Plot the mean difference heatmap (1 - cosine similarity)
         act_diff_mean = 1 - np.array(act_cosine_mean)
@@ -226,8 +231,12 @@ class NeuronDeveloper():
         fig.colorbar(cax2, ax=ax2)
         ax2.set_title(f'Mean Layer Activations Difference For Each Class at Task {task_id} (Normalized)', fontsize=18)
         ax2.set(ylabel='Layer', xlabel='Class', 
-                yticks=[0], xticks=range(10), 
-                xticklabels=[str(i) for i in range(10)])
+            yticks=[0], xticks=range(10), 
+            xticklabels=[str(i) for i in range(10)])
+
+        # Annotate the mean heatmap with the values
+        for j in range(act_diff_mean.shape[0]):
+            ax2.text(j, 0, f'{act_diff_mean[j]:.2f}', ha='center', va='center', color='black')
         
         # Adjust layout and show the plot
         plt.tight_layout()
