@@ -43,9 +43,9 @@ table.set_fontsize(14)  # Adjust font size as needed
 table.scale(1, 2)  # Adjust scaling to fit your text
 for key, cell in table.get_celld().items():
     if key[1] in [0]:  # Indices of Task 0 to Task 4 columns
-        cell.set_width(0.2)  # Set a different width for these specific columns
+        cell.set_width(0.35)  # Set a different width for these specific columns
     if key[1] in [1]:
-        cell.set_width(0.3)
+        cell.set_width(0.25)
 
 # Color formatting for task columns based on value
 task_cols = [df.columns.get_loc(col) for col in df.columns if 'Task' in col or col == 'All Task']

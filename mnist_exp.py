@@ -1,5 +1,6 @@
 #%%
 # Import necessary libraries
+import os
 import copy
 import sys
 import torch
@@ -10,8 +11,8 @@ from torchvision import datasets, transforms
 from utils.nn import train_network, evaluate_per_task, log_accuracy, compute_stable_rank
 from utils.sleep import sleep_phase
 from utils.task import create_class_task
-from utils.nn import SimpleNN, NeuronDeveloper
-disable_neuron_developer = True
+from utils.nn import SimpleNN, LowRankNN, NeuronDeveloper
+disable_neuron_developer = False
 
 #%%
 # MNIST Dataset Loading
@@ -218,7 +219,7 @@ for iteration in [500]:
                 'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
                 'samples_per_iter': 10, # original: (entire X from current task)
                 # [Callback]
-                'callback_steps': 100, # Set to sys.maxsize to disable
+                'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
                 'save_best': False,
                 # [Synaptic Snapshots]
                 'save_synaptic_snapshots': False,
@@ -296,7 +297,83 @@ neuron_developer.reduce(pca_components=10)
 neuron_developer.show(mean_pooling)
 
 #%%
-# Exp 3: Sequential Training
+# Exp 3: Low-rank Model Merging
+
+print('---------- Low-rank Model Merging ----------')
+
+max_rank = 8
+print(f'Max Rank: {max_rank}')
+
+task_models = []
+
+# # [Visual] Initialize the NeuronDeveloper for layer visualization
+# neuron_developer = NeuronDeveloper(title=f'Layer Activations: Low-rank Model Merging',
+#                                    output_path=f'./png/layer_activations_low_rank_merging.png',
+#                                    disable=disable_neuron_developer)
+
+task_model_init = LowRankNN(nn_size_template, max_rank=max_rank).to(device)
+
+eval_results = evaluate_per_task(task_model_init, test_X_list, test_Y_list)
+print('Initial', eval_results)
+acc_df = log_accuracy('Low-rank Model Merging', 'Initial', acc_df, eval_results)
+
+for task_id in range(num_tasks):
+    task_model = copy.deepcopy(task_model_init) # Use the same initial weights for each task (align with Exp 2)
+    # task_model = LowRankNN(nn_size_template, max_rank).to(device) # Use different initial weights for each task
+
+    train_X_task = train_X_list[task_id]
+    train_Y_task = train_Y_list[task_id]
+
+    task_model = train_network(task_model, train_X_task, train_Y_task, opts)
+    
+    eval_results = evaluate_per_task(task_model, test_X_list, test_Y_list)
+    print('Task ' + str(task_id), eval_results)
+    acc_df = log_accuracy('Low-rank Model Merging', 'Task ' + str(task_id), acc_df, eval_results)
+
+    # # [Visual] Record activations layer visualization
+    # neuron_developer.record(task_model.get_simple_nn(), train_X_sequential, 'Task ' + str(task_id) + ' Model')
+
+    task_models.append(task_model)
+
+# Merge the models
+merged_model = SimpleNN(nn_size_template).to(device)
+for layer in merged_model.layers:
+    if hasattr(layer, 'weight'):
+        torch.nn.init.constant_(layer.weight, 0)
+    if hasattr(layer, 'bias') and layer.bias is not None:
+        torch.nn.init.constant_(layer.bias, 0)
+
+for task_model in task_models:
+    task_model_simple_nn = task_model.get_simple_nn()
+    for i, layer in enumerate(task_model_simple_nn.layers):
+        with torch.no_grad():
+            merged_model.layers[i].weight += layer.weight / num_tasks
+            if layer.bias is not None:
+                merged_model.layers[i].bias += layer.bias / num_tasks
+
+eval_results = evaluate_per_task(merged_model, test_X_list, test_Y_list)
+print('Merged', eval_results)
+acc_df = log_accuracy('Low-rank Model Merging', 'Merged', acc_df, eval_results)
+
+# # [Visual] Record activations layer visualization
+# neuron_developer.record(merged_model, train_X_sequential, 'Merged')
+
+# # [Visual] Reduce the dimensionality of the activations using PCA
+# neuron_developer.reduce(pca_components=10)
+
+# # [Visual] Show and save the plot
+# neuron_developer.show(mean_pooling)
+
+parallel_model = LowRankNN(nn_size_template, max_rank=max_rank).to(device)
+
+train_network(parallel_model, train_X, train_Y, opts)
+
+eval_results = evaluate_per_task(parallel_model, test_X_list, test_Y_list)
+print('Parallel (reference)', eval_results)
+acc_df = log_accuracy('Low-rank Model Merging', 'Parallel (reference)', acc_df, eval_results)
+
+#%%
+# Exp 4: Sequential Training
 
 print('---------- Sequential Training ----------')
 
@@ -336,7 +413,7 @@ print('After Training', eval_results)
 acc_df = log_accuracy('Sequential', 'After Training', acc_df, eval_results)
 
 #%%
-# Exp x: Sequential Training (Cheat 1)
+# Exp 5: Sequential Training (Cheat 1)
 
 print('---------- Sequential Training (Cheat 1) ----------')
 
@@ -384,7 +461,7 @@ acc_df = log_accuracy('Sequential (Cheat)', 'After Training', acc_df, eval_resul
 
 
 #%%
-# Exp 4: Parallel Training
+# Exp 6: Parallel Training
 
 print('---------- Parallel Training ----------')
 
@@ -422,5 +499,5 @@ acc_df.to_csv(f'results.csv', index=False)
 
 #%%
 # Render the results (this import itself will do the rendering)
-import render_results
+os.system('python render_results.py --results results.csv --output results.png')
 # %%

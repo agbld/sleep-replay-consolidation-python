@@ -23,6 +23,52 @@ class SimpleNN(nn.Module):
         x = self.layers[-1](x)
         return x
 
+class LowRankLinear(nn.Module):
+    def __init__(self, in_features, out_features, rank):
+        super(LowRankLinear, self).__init__()
+        self.rank = rank
+        # Define the two lower-rank matrices
+        self.A = nn.Linear(rank, out_features, bias=False)  # A: (out_features x rank)
+        self.B = nn.Linear(in_features, rank, bias=False)   # B: (rank x in_features)
+
+    def forward(self, x):
+        # Perform the low-rank linear transformation
+        return self.A(self.B(x))
+
+
+class LowRankNN(nn.Module):
+    def __init__(self, layers, max_rank):
+        super(LowRankNN, self).__init__()
+        self.layers = nn.ModuleList()
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=0.25)
+
+        # Initialize low-rank linear layers
+        for i in range(len(layers) - 1):
+            self.layers.append(LowRankLinear(layers[i], layers[i + 1], max_rank))
+
+    def forward(self, x):
+        for layer in self.layers[:-1]:
+            x = layer(x)  # Apply low-rank linear layer
+            x = self.relu(x)
+            x = self.dropout(x)
+        
+        # For the last layer, no ReLU or Dropout
+        x = self.layers[-1](x)
+        return x
+
+    def get_simple_nn(self):
+        # Convert the low-rank model to a simple model
+        simple_layers = [layer.A.weight.data.shape[1] for layer in self.layers]
+        simple_layers.append(self.layers[-1].A.weight.data.shape[0])
+        simple_nn = SimpleNN(simple_layers)
+        
+        # Copy the weights from the low-rank model to the simple model
+        for i, layer in enumerate(simple_nn.layers):
+            layer.weight.data = self.layers[i].A.weight.data @ self.layers[i].B.weight.data
+        
+        return simple_nn
+
 def train_network(model, train_x, train_y, opts, verbose=False):
     model.train()
     optimizer = optim.SGD(model.parameters(), lr=opts['learning_rate'], momentum=opts['momentum'])
