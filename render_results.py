@@ -6,9 +6,16 @@ import seaborn as sns
 from matplotlib.colors import Normalize
 from matplotlib.cm import Greens
 from matplotlib import font_manager as fm
+import argparse
+
+# Argument parser
+parser = argparse.ArgumentParser(description='Render results')
+parser.add_argument('--results', type=str, default='./results.csv', help='Path to the results CSV file')
+parser.add_argument('--output', type=str, default='./results.png', help='Path to the output PNG file')
+args = parser.parse_args()
 
 # Load the CSV file into a DataFrame, selecting specific columns
-df = pd.read_csv('./results.csv', usecols=['Approach', 'Stage', 'steps', 'Task 0', 'Task 1', 'Task 2', 'Task 3', 'Task 4', 'Task All'])
+df = pd.read_csv(args.results, usecols=['Approach', 'Stage', 'steps', 'Task 0', 'Task 1', 'Task 2', 'Task 3', 'Task 4', 'Task All'])
 df = df[['Approach', 'Stage', 'steps', 'Task 0', 'Task 1', 'Task 2', 'Task 3', 'Task 4', 'Task All']]
 df = df[~df['Stage'].str.contains('Initial')]
 df = df[~df['Stage'].str.contains('Synthetic')]
@@ -58,6 +65,6 @@ for col in range(len(df.columns)):
     table[(0, col)].set_text_props(weight='bold')
 
 # Save the figure
-plt.savefig('./results.png', bbox_inches='tight', dpi=300)
+plt.savefig(args.output, bbox_inches='tight', dpi=300)
 
 # %%
