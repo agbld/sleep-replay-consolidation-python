@@ -204,7 +204,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     return acc_df
 
-for iteration in [1000]:
+for iteration in [500]:
     for mask_fraction in [0.25]:
         acc_df = run_sleep_exp(
             acc_df, 
@@ -221,7 +221,7 @@ for iteration in [1000]:
                 'callback_steps': 100, # Set to sys.maxsize to disable
                 'save_best': False,
                 # [Synaptic Snapshots]
-                'save_synaptic_snapshots': True,
+                'save_synaptic_snapshots': False,
                 'synaptic_snapshots_steps': 100,
                 'synaptic_snapshots_layer': [0],
                 'synaptic_selection': 'mean',

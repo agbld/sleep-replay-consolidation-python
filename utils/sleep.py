@@ -163,8 +163,9 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     acc_df = callback_func(nn, acc_df, args)
                     if save_best:
                         acc_dict = acc_df[-1]
-                        if acc_dict['All'] > acc_all_best:
-                            acc_all_best = acc_dict['All']
+                        task_all_acc = float(acc_dict['Task All'])
+                        if task_all_acc > acc_all_best:
+                            acc_all_best = task_all_acc
                             nn_best = copy.deepcopy(nn)
 
                 pbar.update(1)

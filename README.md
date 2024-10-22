@@ -89,25 +89,6 @@ The following figure shows the stable rank of each layer across different tasks.
 
 ![image](./png/src-before-after-stable-rank.jpg)
 
-### Hidden States Difference Visualization
-
-In this experiment, we visualize the changes in the hidden states of the model before and after SRC for each layer across tasks to support our hypothesis.
-
-The heatmaps show the $\text{difference}$ in model hidden states before and after SRC for each layer across tasks. The $\text{difference}$ is calculated as follows:
-
-$$\text{difference} = 1 - \text{sim}(h_{\text{before}}, h_{\text{after}})$$
-
-where $\text{sim}(h_{\text{before}}, h_{\text{after}})$ is the cosine similarity between the hidden states before and after SRC.
-These $\text{differences}$ are then be averaged according to layer and ground truth class of the input data.
-
-![](./png/activation_diff_task_0_before_after_src.png)
-![](./png/activation_diff_task_1_before_after_src.png)
-![](./png/activation_diff_task_2_before_after_src.png)
-![](./png/activation_diff_task_3_before_after_src.png)
-![](./png/activation_diff_task_4_before_after_src.png)
-
-By observing the heatmaps, we can see that the changes in the hidden states are less significant in the current tasks compared to the previous tasks. This indicates that the SRC algorithm is able to **maintain the model's behavior on current tasks** while attempting to recover the performance on previous tasks.
-
 ### Neuron Activity Visualization
 
 The following visualizations show the activations for each model across different tasks in sequence.
@@ -164,6 +145,84 @@ In this experiment, task-specific models are trained independently on different 
 #### Parallel Learning (Upper Bound)
 
 ![](./png/layer_activations_parallel.png)
+
+### Hidden States Difference Visualization
+
+In this experiment, we visualize the changes in the hidden states of the model before and after SRC for each layer across tasks to support our hypothesis.
+
+The heatmaps show the $\text{difference}$ in model hidden states before and after SRC for each layer across tasks. The $\text{difference}$ is calculated as follows:
+
+$$\text{difference} = 1 - \text{sim}(h_{\text{before}}, h_{\text{after}})$$
+
+where $\text{sim}(h_{\text{before}}, h_{\text{after}})$ is the cosine similarity between the hidden states before and after SRC.
+These $\text{differences}$ are then be averaged according to layer and ground truth class of the input data.
+
+![](./png/activation_diff_task_0_before_after_src.png)
+![](./png/activation_diff_task_1_before_after_src.png)
+![](./png/activation_diff_task_2_before_after_src.png)
+![](./png/activation_diff_task_3_before_after_src.png)
+![](./png/activation_diff_task_4_before_after_src.png)
+
+By observing the heatmaps, we can see that the changes in the hidden states are less significant in the current tasks compared to the previous tasks. This indicates that the SRC algorithm is able to **maintain the model's behavior on current tasks** while attempting to recover the performance on previous tasks.
+
+### First Layer Synaptics Visualization
+
+In this experiment, we extract the synaptic weights of the first layer (784x4000 matrix), average them across 4000 neurons to form a 784x1 vector, and reshape this into a 28x28 "synaptic snapshot." These snapshots, captured at different iterations of the SRC algorithm, are compiled into GIFs to visualize the weight evolution.
+
+Our hypothesis is that the SRC algorithm will shape the synaptic weights to resemble the input data. We believe this happens because, in the SRC framework, when a neuron spikes, the synapses receiving input from active neurons are strengthened, while those connected to inactive (non-spiking) neurons are weakened. Through repeated iterations, this selective strengthening and weakening of connections should make the synaptic weights more aligned with the patterns in the input data.
+
+Following are the visualizations with usual settings:
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_0.gif" alt="First Layer Synaptic Snapshot Task 0" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 0 ("0", "1")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_1.gif" alt="First Layer Synaptic Snapshot Task 1" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 1 ("2", "3")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_2.gif" alt="First Layer Synaptic Snapshot Task 2" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 2 ("4", "5")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_3.gif" alt="First Layer Synaptic Snapshot Task 3" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 3 ("6", "7")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_4.gif" alt="First Layer Synaptic Snapshot Task 4" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 4 ("8", "9")</figcaption>
+  </figure>
+</div>
+
+Here's a more aggressive setting just for visualization:
+* Only one hand-written digit is used for each task.
+* Much longer SRC iterations (> 2000) are used.
+* Much larger increment and decrement factors are used.
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_0_agg.gif" alt="First Layer Synaptic Snapshot Task 0" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 0 ("0")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_1_agg.gif" alt="First Layer Synaptic Snapshot Task 1" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 1 ("1")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_2_agg.gif" alt="First Layer Synaptic Snapshot Task 2" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 2 ("2")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_3_agg.gif" alt="First Layer Synaptic Snapshot Task 3" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 3 ("3")</figcaption>
+  </figure>
+  <figure style="width: 11%; text-align: center;">
+    <img src="./png/first_layer_synaptic_snapshot_task_4_agg.gif" alt="First Layer Synaptic Snapshot Task 4" style="width: 100%; image-rendering: pixelated;">
+    <figcaption>Task 4 ("4")</figcaption>
+  </figure>
+</div>
 
 ---
 
