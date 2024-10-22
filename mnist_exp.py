@@ -150,7 +150,9 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
         src_model, acc_df = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task, 
                                         callback_func=callback_func, callback_steps=sleep_opts['callback_steps'], acc_df=acc_df,
-                                        save_synaptic_snapshots=sleep_opts['save_synaptic_snapshots'], synaptic_snapshots_steps=sleep_opts['synaptic_snapshots_steps'], synaptic_snapshots_layer=sleep_opts['synaptic_snapshots_layer'], synaptic_selection=sleep_opts['synaptic_selection'],
+                                        save_synaptic_snapshots=sleep_opts['save_synaptic_snapshots'], synaptic_snapshots_steps=sleep_opts['synaptic_snapshots_steps'], 
+                                        synaptic_snapshots_folder=f'synaptic_snapshots/task_{task_id}', synaptic_snapshots_layer=sleep_opts['synaptic_snapshots_layer'], 
+                                        synaptic_selection=sleep_opts['synaptic_selection'],
                                         save_best=sleep_opts['save_best'])
         
         # Print the evaluation results after SRC
@@ -202,7 +204,7 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
     return acc_df
 
-for iteration in [500]:
+for iteration in [1000]:
     for mask_fraction in [0.25]:
         acc_df = run_sleep_exp(
             acc_df, 
@@ -216,13 +218,13 @@ for iteration in [500]:
                 'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
                 'samples_per_iter': 10, # original: (entire X from current task)
                 # [Callback]
-                'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
+                'callback_steps': 100, # Set to sys.maxsize to disable
                 'save_best': False,
                 # [Synaptic Snapshots]
-                'save_synaptic_snapshots': False,
-                'synaptic_snapshots_steps': 1000,
+                'save_synaptic_snapshots': True,
+                'synaptic_snapshots_steps': 100,
                 'synaptic_snapshots_layer': [0],
-                'synaptic_selection': 'max',
+                'synaptic_selection': 'mean',
             },
         )
         

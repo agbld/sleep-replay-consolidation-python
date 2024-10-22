@@ -3,6 +3,7 @@ from typing import Tuple
 
 from matplotlib import pyplot as plt
 from utils.nn import SimpleNN
+from utils.synaptics_gif_maker import make_gif
 import torch
 import numpy as np
 import warnings
@@ -51,6 +52,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
             accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
             last_accum_H_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
             last_accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
+            total_spikes = 0
 
             for t in range(num_iterations):
                 # Create Poisson-distributed spikes from the input images
@@ -77,6 +79,7 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     # Update spiking state based on membrane potential and threshold
                     threshold = sleep_opts['threshold'] * sleep_opts['beta'][l - 1]
                     spikes[l] = torch.Tensor((membrane_potentials[l] >= threshold).float())
+                    total_spikes += torch.sum(spikes[l])
 
                     # Get pre-synaptic spikes and post-synaptic spikes
                     pre = spikes[l - 1].unsqueeze(0)  # (num_pre_neurons,) -> (1, num_pre_neurons)
@@ -137,14 +140,6 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                     dH_inc_norm = [torch.norm(torch.flatten(dH), p=2).item() for dH in dH_inc]
                     dH_dec_norm = [torch.norm(torch.flatten(dH), p=2).item() for dH in dH_dec]
 
-                    # Reset the log variables
-                    accum_dW_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
-                    accum_dW_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
-                    last_accum_H_inc = copy.deepcopy(accum_H_inc)
-                    last_accum_H_dec = copy.deepcopy(accum_H_dec)
-                    accum_H_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
-                    accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
-
                     args = {
                         'steps': int(t),
                         'dW_inc_norm': dW_inc_norm,
@@ -152,8 +147,18 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                         'dH_inc_norm': dH_inc_norm,
                         'dH_dec_norm': dH_dec_norm,
                         'H_inc_norm': H_inc_norm,
-                        'H_dec_norm': H_dec_norm
+                        'H_dec_norm': H_dec_norm,
+                        'total_spikes': int(total_spikes)
                     }
+
+                    # Reset the log variables
+                    accum_dW_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
+                    accum_dW_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
+                    last_accum_H_inc = copy.deepcopy(accum_H_inc)
+                    last_accum_H_dec = copy.deepcopy(accum_H_dec)
+                    accum_H_inc = [torch.zeros_like(layer.weight) for layer in nn.layers]
+                    accum_H_dec = [torch.zeros_like(layer.weight) for layer in nn.layers]
+                    total_spikes = 0
 
                     acc_df = callback_func(nn, acc_df, args)
                     if save_best:
@@ -172,6 +177,11 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
                 for l in range(1, len(nn_size)):
                     nn.layers[l - 1].weight = sleep_opts['gamma'] * nn.layers[l - 1].weight / (torch.max(nn.layers[l - 1].weight) - torch.min(nn.layers[l - 1].weight)) * \
                         (torch.max(sleep_opts['W_old'][l - 1]) - torch.min(sleep_opts['W_old'][l - 1]))
+                    
+            # [Synaptic Snapshots] Make GIFs for all snapshots folders
+            if save_synaptic_snapshots:
+                for l in synaptic_snapshots_layer:
+                    make_gif(f"{synaptic_snapshots_folder}/layer_{l}", f"{synaptic_snapshots_folder}/layer_{l}.gif")
                 
     if save_best:
         return nn_best, acc_df
