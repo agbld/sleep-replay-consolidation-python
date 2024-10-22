@@ -69,6 +69,15 @@ Following are the experiments conducted solely on this Python implementation.
 
 The `mnist_exp.py` script try to replicate the original experiment ([see here!](https://github.com/tmtadros/SleepReplayConsolidation/blob/main/MNIST/run_class_task_summary.m)) on the MNIST dataset. Using the SRC algorithm ([see here!](https://github.com/tmtadros/SleepReplayConsolidation/blob/main/sleep/sleepnn_old.m)) that originally implemented in MATLAB.
 
+### Baseline Approach
+
+Except for the SRC algorithm, we also implement the following approaches for comparison:
+* **Parallel Learning**: Train a model with all available data from all tasks. This should be the upper bound of the performance.
+* **Sequential Learning**: Train a single model sequentially on all tasks.
+* **Sequential (Cheat)**: This approach is essentially a slightly modified version of sequential learning. In this approach, the model is given a hint regarding whether the input belongs to the current task or not. If the input does not belong to the current task, the corresponding output will be masked.
+* **Model Merging**: In this approach, task-specific models are trained independently on different tasks from the same checkpoint (i.e., the same initial weights). After training, the models are merged by averaging their weights.
+* **Low-rank Model Merging**: Similar to the model merging approach, but we constrain the weight matrices to have a low rank.
+
 ### Accuracy
 
 ![image](./results.png)
@@ -129,8 +138,6 @@ According to the comparison between the **Before SRC** and **After SRC** models,
 <!-- Additionally, by observing the **synthetic model**, we can see that the output distributions are **very similar to those of the After SRC model** for the last task, but the **neurons related to the current task are noticeably less active**. For instance, when comparing the synthetic model from task 4 with the After SRC model from task 3, we can see that the two rightmost neurons, i.e., the 8th and 9th neurons, in the synthetic model are dimmer than those in the After SRC model. -->
 
 #### Model Merging (Average)
-
-In this experiment, task-specific models are trained independently on different tasks from the same checkpoint (i.e., the same initial weights). After training, the models are merged by averaging their weights.
 
 ![](./png/layer_activations_merging.png)
 
