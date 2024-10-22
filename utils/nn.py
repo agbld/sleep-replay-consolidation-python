@@ -34,7 +34,21 @@ class LowRankLinear(nn.Module):
     def forward(self, x):
         # Perform the low-rank linear transformation
         return self.A(self.B(x))
-
+    
+    def __add__(self, other):
+        if not isinstance(other, LowRankLinear):
+            raise ValueError("Both operands must be instances of LowRankLinear")
+        
+        # Concatenate the A matrices and B matrices
+        A_prime = torch.cat((self.A.weight.data, other.A.weight.data), dim=1)
+        B_prime = torch.cat((self.B.weight.data, other.B.weight.data), dim=0)
+        
+        # Create a new LowRankLinear layer with the concatenated matrices
+        new_layer = LowRankLinear(self.B.in_features, self.A.out_features, self.rank + other.rank)
+        new_layer.A.weight.data = A_prime
+        new_layer.B.weight.data = B_prime
+        
+        return new_layer
 
 class LowRankNN(nn.Module):
     def __init__(self, layers, max_rank):
@@ -68,6 +82,22 @@ class LowRankNN(nn.Module):
             layer.weight.data = self.layers[i].A.weight.data @ self.layers[i].B.weight.data
         
         return simple_nn
+    
+    def __add__(self, other):
+        if not isinstance(other, LowRankNN):
+            raise ValueError("Both operands must be instances of LowRankNN")
+        if len(self.layers) != len(other.layers):
+            raise ValueError("Both LowRankNN models must have the same number of layers")
+
+        new_layers = []
+        for self_layer, other_layer in zip(self.layers, other.layers):
+            if self_layer.A.out_features != other_layer.A.out_features or self_layer.B.in_features != other_layer.B.in_features:
+                raise ValueError("Both LowRankNN models must have the same number of neurons in each layer")
+            new_layers.append(self_layer + other_layer)
+
+        new_model = LowRankNN([layer.B.in_features for layer in self.layers] + [self.layers[-1].A.out_features], max_rank=self.layers[0].rank + other.layers[0].rank)
+        new_model.layers = nn.ModuleList(new_layers)
+        return new_model
 
 def train_network(model, train_x, train_y, opts, verbose=False):
     model.train()

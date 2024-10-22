@@ -373,7 +373,72 @@ print('Parallel (reference)', eval_results)
 acc_df = log_accuracy('Low-rank Model Merging', 'Parallel (reference)', acc_df, eval_results)
 
 #%%
-# Exp 4: Sequential Training
+# Exp 4: Low-rank Model Concat
+
+print('---------- Low-rank Model Concat ----------')
+
+max_rank = 10
+print(f'Max Rank: {max_rank}')
+
+task_models = []
+
+# [Visual] Initialize the NeuronDeveloper for layer visualization
+neuron_developer = NeuronDeveloper(title=f'Layer Activations: Low-rank Model Concat',
+                                   output_path=f'./png/layer_activations_low_rank_concat.png',
+                                   disable=disable_neuron_developer)
+
+task_model_init = LowRankNN(nn_size_template, max_rank=max_rank).to(device)
+
+eval_results = evaluate_per_task(task_model_init, test_X_list, test_Y_list)
+print('Initial', eval_results)
+acc_df = log_accuracy('Low-rank Model Concat', 'Initial', acc_df, eval_results)
+
+for task_id in range(num_tasks):
+    # task_model = copy.deepcopy(task_model_init) # Use the same initial weights for each task (align with Exp 2)
+    task_model = LowRankNN(nn_size_template, max_rank).to(device) # Use different initial weights for each task
+
+    train_X_task = train_X_list[task_id]
+    train_Y_task = train_Y_list[task_id]
+
+    task_model = train_network(task_model, train_X_task, train_Y_task, opts)
+    
+    eval_results = evaluate_per_task(task_model, test_X_list, test_Y_list)
+    print('Task ' + str(task_id), eval_results)
+    acc_df = log_accuracy('Low-rank Model Concat', 'Task ' + str(task_id), acc_df, eval_results)
+
+    # [Visual] Record activations layer visualization
+    neuron_developer.record(task_model.get_simple_nn(), train_X_sequential, 'Task ' + str(task_id) + ' Model')
+
+    task_models.append(task_model)
+
+# Merge the models
+merged_model = task_models[0]
+for task_model in task_models[1:]:
+    merged_model = merged_model + task_model
+
+eval_results = evaluate_per_task(merged_model, test_X_list, test_Y_list)
+print('Concated', eval_results)
+acc_df = log_accuracy('Low-rank Model Concat', 'Concated', acc_df, eval_results)
+
+# [Visual] Record activations layer visualization
+neuron_developer.record(merged_model.get_simple_nn(), train_X_sequential, 'Concated')
+
+# [Visual] Reduce the dimensionality of the activations using PCA
+neuron_developer.reduce(pca_components=10)
+
+# [Visual] Show and save the plot
+neuron_developer.show(mean_pooling)
+
+parallel_model = LowRankNN(nn_size_template, max_rank=max_rank).to(device)
+
+train_network(parallel_model, train_X, train_Y, opts)
+
+eval_results = evaluate_per_task(parallel_model, test_X_list, test_Y_list)
+print('Parallel (reference)', eval_results)
+acc_df = log_accuracy('Low-rank Model Concat', 'Parallel (reference)', acc_df, eval_results)
+
+#%%
+# Exp 5: Sequential Training
 
 print('---------- Sequential Training ----------')
 
@@ -413,7 +478,7 @@ print('After Training', eval_results)
 acc_df = log_accuracy('Sequential', 'After Training', acc_df, eval_results)
 
 #%%
-# Exp 5: Sequential Training (Cheat 1)
+# Exp 6: Sequential Training (Cheat 1)
 
 print('---------- Sequential Training (Cheat 1) ----------')
 
@@ -461,7 +526,7 @@ acc_df = log_accuracy('Sequential (Cheat)', 'After Training', acc_df, eval_resul
 
 
 #%%
-# Exp 6: Parallel Training
+# Exp 7: Parallel Training
 
 print('---------- Parallel Training ----------')
 
