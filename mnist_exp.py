@@ -12,7 +12,7 @@ from utils.nn import train_network, evaluate_per_task, log_accuracy, compute_sta
 from utils.sleep import sleep_phase
 from utils.task import create_class_task
 from utils.nn import SimpleNN, LowRankNN, NeuronDeveloper
-disable_neuron_developer = False
+disable_neuron_developer = True
 
 #%%
 # MNIST Dataset Loading
@@ -301,7 +301,7 @@ neuron_developer.show(mean_pooling)
 
 print('---------- Low-rank Model Merging ----------')
 
-max_rank = 8
+max_rank = 10
 print(f'Max Rank: {max_rank}')
 
 task_models = []
