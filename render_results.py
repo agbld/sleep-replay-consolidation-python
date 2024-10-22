@@ -57,7 +57,8 @@ for (i, j), val in np.ndenumerate(df.values):
 
 # Make all font bold in rows with "After Training" under "Stage"
 after_training_rows = df.index[df['Stage'].str.contains('After Training') |
-                               df['Stage'].str.contains('Merge')].tolist()
+                               df['Stage'].str.contains('Merge') |
+                               df['Stage'].str.contains('Concat')].tolist()
 for row in after_training_rows:
     for col in range(len(df.columns)):
         table[(row + 1, col)].set_text_props(weight='bold')

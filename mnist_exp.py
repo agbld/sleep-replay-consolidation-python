@@ -74,7 +74,6 @@ print('---------- Sleep Replay Consolidation (SRC) ----------')
 
 def run_sleep_exp(acc_df: list, sleep_opts_update={}):
 
-    # src_model = SimpleNN([784, 1200, 1200, 10])
     src_model = SimpleNN(nn_size_template).to(device)
 
     # Define the hyperparameters for the sleep phase
