@@ -173,55 +173,25 @@ Our hypothesis is that the SRC algorithm will shape the synaptic weights to rese
 
 Following are the visualizations with usual settings:
 
-<div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_0.gif" alt="First Layer Synaptic Snapshot Task 0" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 0 ("0", "1")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_1.gif" alt="First Layer Synaptic Snapshot Task 1" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 1 ("2", "3")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_2.gif" alt="First Layer Synaptic Snapshot Task 2" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 2 ("4", "5")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_3.gif" alt="First Layer Synaptic Snapshot Task 3" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 3 ("6", "7")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_4.gif" alt="First Layer Synaptic Snapshot Task 4" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 4 ("8", "9")</figcaption>
-  </figure>
-</div>
+<div style="display: flex; justify-content: space-around;">
+  <img src="./png/first_layer_synaptic_snapshot_task_0.gif" alt="Task 0 ('0', '1')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_1.gif" alt="Task 1 ('2', '3')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_2.gif" alt="Task 2 ('4', '5')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_3.gif" alt="Task 3 ('6', '7')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_4.gif" alt="Task 4 ('8', '9')" width="18%" style="image-rendering: pixelated;">
+</div><br>
 
 Here's a more aggressive setting just for visualization:
 * Only one hand-written digit is used for each task.
 * Much longer SRC iterations (> 2000) are used.
 * Much larger increment and decrement factors are used.
 
-<div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_0_agg.gif" alt="First Layer Synaptic Snapshot Task 0" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 0 ("0")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_1_agg.gif" alt="First Layer Synaptic Snapshot Task 1" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 1 ("1")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_2_agg.gif" alt="First Layer Synaptic Snapshot Task 2" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 2 ("2")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_3_agg.gif" alt="First Layer Synaptic Snapshot Task 3" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 3 ("3")</figcaption>
-  </figure>
-  <figure style="width: 11%; text-align: center;">
-    <img src="./png/first_layer_synaptic_snapshot_task_4_agg.gif" alt="First Layer Synaptic Snapshot Task 4" style="width: 100%; image-rendering: pixelated;">
-    <figcaption>Task 4 ("4")</figcaption>
-  </figure>
+<div style="display: flex; justify-content: space-around;">
+  <img src="./png/first_layer_synaptic_snapshot_task_0_agg.gif" alt="Task 0 ('0', '1')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_1_agg.gif" alt="Task 1 ('2', '3')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_2_agg.gif" alt="Task 2 ('4', '5')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_3_agg.gif" alt="Task 3 ('6', '7')" width="18%" style="image-rendering: pixelated;">
+  <img src="./png/first_layer_synaptic_snapshot_task_4_agg.gif" alt="Task 4 ('8', '9')" width="18%" style="image-rendering: pixelated;">
 </div>
 
 ---
