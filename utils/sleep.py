@@ -1,15 +1,20 @@
+import shutil
 from typing import Tuple
+
+from matplotlib import pyplot as plt
 from utils.nn import SimpleNN
 import torch
 import numpy as np
 import warnings
 import copy
 from tqdm import tqdm
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Tensor, device: torch.device = device,
-                callback_func = None, callback_steps = 0, acc_df = None,
+                callback_func = None, callback_steps = 0, acc_df = None, 
+                save_synaptic_snapshots = False, synaptic_snapshots_steps = 0, synaptic_snapshots_folder = 'synaptic_snapshots', synaptic_snapshots_layer = [0], synaptic_selection = 'max',
                 save_best = False) -> Tuple[SimpleNN, dict]:
     nn = copy.deepcopy(nn)  # Create a deep copy of the network to avoid modifying the original network
 
@@ -98,6 +103,23 @@ def sleep_phase(nn: SimpleNN, num_iterations: int, sleep_opts: dict, X: torch.Te
 
                     # Update the refractory period for spiking neurons
                     refrac_end[l][spikes[l] == 1] = t + sleep_opts['t_ref']
+
+                # [Synaptic Snapshots] Save synaptic snapshots if required
+                if save_synaptic_snapshots and (t % synaptic_snapshots_steps == 0 or t == num_iterations - 1):
+                    for l in synaptic_snapshots_layer:
+                        layer_synaptics = nn.layers[l].weight.cpu().detach().numpy()
+                        if synaptic_selection == 'max':
+                            max_potential_neuron = torch.argmax(membrane_potentials[l + 1])
+                            synaptics_to_max_neuron = layer_synaptics[max_potential_neuron]
+                            synaptics_img = synaptics_to_max_neuron.reshape(28, 28)
+                        elif synaptic_selection == 'mean':
+                            mean_synaptics = np.mean(layer_synaptics, axis=0)
+                            synaptics_img = mean_synaptics.reshape(28, 28)
+                        else:
+                            raise ValueError(f"Invalid synaptic_selection method: {synaptic_selection}")
+                        save_path = f"{synaptic_snapshots_folder}/layer_{l}/iter_{t}.png"
+                        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                        plt.imsave(save_path, synaptics_img, cmap='gray')
 
                 # [Callback] Execute callback function if provided
                 if (callback_func is not None) and (t % callback_steps == 0 or t == num_iterations - 1):

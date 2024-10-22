@@ -147,9 +147,10 @@ def run_sleep_exp(acc_df: list, sleep_opts_update={}):
             evaluate_results = evaluate_per_task(nn, test_X_list, test_Y_list)
             acc_df = log_accuracy('SRC', 'Task ' + str(task_id), acc_df, evaluate_results, _sleep_opts)
             return acc_df
-        
+
         src_model, acc_df = sleep_phase(src_model, sleep_period, sleep_opts, train_X_task, 
                                         callback_func=callback_func, callback_steps=sleep_opts['callback_steps'], acc_df=acc_df,
+                                        save_synaptic_snapshots=sleep_opts['save_synaptic_snapshots'], synaptic_snapshots_steps=sleep_opts['synaptic_snapshots_steps'], synaptic_snapshots_layer=sleep_opts['synaptic_snapshots_layer'], synaptic_selection=sleep_opts['synaptic_selection'],
                                         save_best=sleep_opts['save_best'])
         
         # Print the evaluation results after SRC
@@ -214,8 +215,14 @@ for iteration in [500]:
                 'bonus_iterations': int(iteration / 3),
                 'mask_fraction': mask_fraction, # original: 0.25 (aprox.)
                 'samples_per_iter': 10, # original: (entire X from current task)
+                # [Callback]
                 'callback_steps': sys.maxsize, # Set to sys.maxsize to disable
                 'save_best': False,
+                # [Synaptic Snapshots]
+                'save_synaptic_snapshots': False,
+                'synaptic_snapshots_steps': 1000,
+                'synaptic_snapshots_layer': [0],
+                'synaptic_selection': 'max',
             },
         )
         
